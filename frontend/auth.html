@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="/js/config.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hassabe — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ── RESET ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A1C06;-webkit-font-smoothing:antialiased}
+
+/* ── LAYOUT: two-column on desktop, full on mobile ── */
+.shell{display:flex;min-height:100vh}
+
+/* Left decorative panel */
+.panel-left{
+  width:420px;flex-shrink:0;
+  background:#0C0902;
+  display:flex;flex-direction:column;
+  justify-content:space-between;
+  padding:40px 44px;
+  position:relative;overflow:hidden;
+}
+.panel-left::before{
+  content:'';position:absolute;
+  width:600px;height:600px;border-radius:50%;
+  background:radial-gradient(circle,rgba(201,168,76,.07) 0%,transparent 65%);
+  top:30%;left:50%;transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+.panel-bg-text{
+  position:absolute;
+  font-family:'Cormorant Garamond',serif;
+  font-size:220px;font-weight:300;
+  color:rgba(201,168,76,.04);
+  bottom:-30px;left:-20px;
+  pointer-events:none;user-select:none;line-height:1;
+}
+.panel-logo{
+  font-family:'Cormorant Garamond',serif;
+  font-size:26px;font-weight:500;color:#FAF0DC;
+  text-decoration:none;position:relative;z-index:1;
+}
+.panel-body{position:relative;z-index:1}
+.panel-body h2{
+  font-family:'Cormorant Garamond',serif;
+  font-size:38px;font-weight:400;color:#FAF0DC;
+  line-height:1.15;margin-bottom:16px;
+}
+.panel-body h2 em{font-style:italic;color:#C9A84C}
+.panel-body p{font-size:14px;font-weight:300;line-height:1.8;color:rgba(232,213,163,.5)}
+.panel-pills{display:flex;flex-direction:column;gap:10px;margin-top:28px}
+.panel-pill{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;
+  border:.5px solid rgba(201,168,76,.15);border-radius:4px;
+  background:rgba(201,168,76,.04);
+}
+.pill-icon{font-size:16px;width:28px;text-align:center}
+.pill-text{font-size:13px;font-weight:300;color:rgba(232,213,163,.6);line-height:1.5}
+.pill-text strong{color:rgba(232,213,163,.85);font-weight:500;display:block;font-size:13px}
+.panel-footer{
+  font-size:11px;color:rgba(232,213,163,.2);
+  letter-spacing:.04em;position:relative;z-index:1;
+}
+
+/* Right auth panel */
+.panel-right{
+  flex:1;
+  background:#FDF8F0;
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 32px;
+  overflow-y:auto;
+}
+.auth-box{width:100%;max-width:400px}
+
+/* ── SCREENS ── */
+.screen{display:none}
+.screen.active{display:block}
+
+/* ── TYPOGRAPHY ── */
+.auth-heading{
+  font-family:'Cormorant Garamond',serif;
+  font-size:34px;font-weight:500;color:#2A1C06;
+  margin-bottom:6px;line-height:1.1;
+}
+.auth-heading em{font-style:italic;color:#C9A84C}
+.auth-sub{font-size:13.5px;font-weight:300;color:#7A6A4F;margin-bottom:32px;line-height:1.65}
+.auth-sub strong{color:#2A1C06;font-weight:500}
+
+/* ── FORM ELEMENTS ── */
+.form-group{margin-bottom:18px;position:relative}
+.form-label{
+  display:block;font-size:11px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:#7A6A4F;margin-bottom:7px;
+}
+.form-input{
+  width:100%;padding:12px 14px;
+  border:.5px solid rgba(139,105,20,.3);border-radius:3px;
+  background:#fff;
+  font-family:'Jost',sans-serif;font-size:14px;font-weight:300;color:#2A1C06;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+}
+.form-input:focus{border-color:#C9A84C;box-shadow:0 0 0 3px rgba(201,168,76,.1)}
+.form-input::placeholder{color:#B5A88C}
+.form-input.error{border-color:#C0392B;box-shadow:0 0 0 3px rgba(192,57,43,.08)}
+.form-input.success{border-color:#27AE60;box-shadow:0 0 0 3px rgba(39,174,96,.08)}
+.field-hint{font-size:12px;color:#7A6A4F;margin-top:5px}
+.field-error{font-size:12px;color:#C0392B;margin-top:5px;display:none}
+.field-error.show{display:block}
+
+/* Password toggle */
+.input-wrap{position:relative}
+.input-wrap .form-input{padding-right:44px}
+.pw-toggle{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;
+  color:#B5A88C;font-size:15px;padding:4px;
+  transition:color .2s;
+}
+.pw-toggle:hover{color:#8B6914}
+
+/* ── BUTTONS ── */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:13px 20px;border-radius:3px;
+  font-family:'Jost',sans-serif;font-size:13px;font-weight:500;
+  letter-spacing:.04em;cursor:pointer;border:none;
+  transition:all .2s;position:relative;overflow:hidden;
+}
+.btn-primary{background:#2A1C06;color:#E8D5A3}
+.btn-primary:hover{background:#1A1005}
+.btn-primary:active{transform:scale(.99)}
+.btn-gold{background:#C9A84C;color:#0C0902}
+.btn-gold:hover{background:#E8D5A3}
+.btn-outline{background:transparent;color:#2A1C06;border:.5px solid rgba(42,28,6,.3)}
+.btn-outline:hover{background:rgba(42,28,6,.04)}
+.btn-ghost{background:transparent;color:#7A6A4F;border:.5px solid rgba(139,105,20,.2)}
+.btn-ghost:hover{background:rgba(201,168,76,.06)}
+.btn:disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
+.btn-spinner{display:none;width:16px;height:16px;border:2px solid transparent;border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite}
+.btn.loading .btn-spinner{display:block}
+.btn.loading .btn-text{opacity:.7}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* SSO buttons */
+.sso-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.sso-btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 16px;border-radius:3px;
+  font-family:'Jost',sans-serif;font-size:13px;font-weight:400;color:#2A1C06;
+  background:#fff;border:.5px solid rgba(42,28,6,.2);
+  cursor:pointer;transition:all .2s;
+}
+.sso-btn:hover{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.04)}
+.sso-icon{font-size:16px;line-height:1}
+
+/* ── DIVIDER ── */
+.or-divider{
+  display:flex;align-items:center;gap:12px;
+  margin:20px 0;font-size:12px;color:#B5A88C;letter-spacing:.04em;
+}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:.5px;background:rgba(42,28,6,.12)}
+
+/* ── OTP INPUT ── */
+.otp-group{display:flex;gap:10px;justify-content:center;margin:28px 0}
+.otp-input{
+  width:52px;height:58px;text-align:center;
+  font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;
+  border:.5px solid rgba(139,105,20,.3);border-radius:3px;
+  background:#fff;color:#2A1C06;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+.otp-input:focus{border-color:#C9A84C;box-shadow:0 0 0 3px rgba(201,168,76,.12)}
+.otp-input.filled{border-color:#C9A84C;background:rgba(201,168,76,.05)}
+
+/* ── PASSWORD STRENGTH ── */
+.pw-strength{margin-top:8px}
+.pw-strength-bars{display:flex;gap:4px;margin-bottom:5px}
+.pw-bar{flex:1;height:3px;border-radius:2px;background:#E0D5C5;transition:background .3s}
+.pw-bar.weak{background:#E74C3C}
+.pw-bar.fair{background:#F39C12}
+.pw-bar.good{background:#27AE60}
+.pw-bar.strong{background:#1A7A4F}
+.pw-strength-label{font-size:11px;color:#7A6A4F}
+
+/* ── PHONE PREFIX ── */
+.phone-row{display:flex;gap:8px}
+.phone-prefix{
+  width:100px;flex-shrink:0;
+  padding:12px 10px;border:.5px solid rgba(139,105,20,.3);border-radius:3px;
+  background:#fff;font-family:'Jost',sans-serif;font-size:14px;color:#2A1C06;
+  appearance:none;outline:none;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238B6914' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+  transition:border-color .2s;
+}
+.phone-prefix:focus{border-color:#C9A84C}
+
+/* ── TABS ── */
+.auth-tabs{display:flex;margin-bottom:24px;border-bottom:.5px solid rgba(42,28,6,.12)}
+.auth-tab{
+  flex:1;padding:10px 16px;
+  font-size:13px;font-weight:400;letter-spacing:.03em;
+  color:#B5A88C;background:none;border:none;
+  border-bottom:2px solid transparent;
+  cursor:pointer;transition:all .2s;margin-bottom:-1px;
+}
+.auth-tab.active{color:#2A1C06;border-bottom-color:#C9A84C;font-weight:500}
+
+/* ── CHECKBOX ── */
+.check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:18px}
+.check-box{
+  width:18px;height:18px;border:.5px solid rgba(139,105,20,.35);
+  border-radius:2px;background:#fff;flex-shrink:0;margin-top:2px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;font-size:11px;
+}
+.check-box.checked{background:#2A1C06;border-color:#2A1C06;color:#E8D5A3}
+.check-label{font-size:13px;font-weight:300;color:#5A4A2E;line-height:1.6;cursor:pointer}
+.check-label a{color:#8B6914;text-decoration:none}
+.check-label a:hover{text-decoration:underline}
+
+/* ── 2FA SETUP ── */
+.tfa-qr{
+  background:#fff;border:.5px solid rgba(139,105,20,.2);
+  border-radius:4px;padding:24px;text-align:center;margin:20px 0;
+}
+.tfa-qr-placeholder{
+  width:140px;height:140px;
+  background:repeating-linear-gradient(45deg,#E8D5A3,#E8D5A3 2px,#fff 2px,#fff 8px);
+  margin:0 auto 12px;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:#7A6A4F;text-align:center;
+}
+.tfa-secret{
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:13px;letter-spacing:.15em;color:#2A1C06;
+  background:rgba(201,168,76,.08);padding:8px 12px;border-radius:3px;
+  display:inline-block;margin:8px 0;cursor:pointer;
+  transition:background .2s;
+}
+.tfa-secret:hover{background:rgba(201,168,76,.16)}
+
+/* ── SUCCESS SCREEN ── */
+.success-wrap{text-align:center;padding:20px 0}
+.success-icon{
+  width:72px;height:72px;border-radius:50%;
+  background:rgba(39,174,96,.1);border:.5px solid rgba(39,174,96,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:30px;margin:0 auto 20px;
+}
+.success-wrap h2{
+  font-family:'Cormorant Garamond',serif;
+  font-size:30px;font-weight:500;color:#2A1C06;margin-bottom:8px;
+}
+.success-wrap p{font-size:14px;font-weight:300;color:#7A6A4F;line-height:1.7;margin-bottom:24px}
+
+/* ── LINKS ── */
+.auth-link{
+  font-size:13px;font-weight:300;color:#7A6A4F;
+  text-align:center;margin-top:20px;
+}
+.auth-link a,.auth-link span{
+  color:#8B6914;cursor:pointer;font-weight:500;
+  text-decoration:none;transition:color .2s;
+}
+.auth-link a:hover,.auth-link span:hover{color:#5C4409}
+
+/* ── BACK BUTTON ── */
+.back-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;color:#7A6A4F;cursor:pointer;
+  background:none;border:none;padding:0;
+  margin-bottom:24px;letter-spacing:.04em;
+  transition:color .2s;
+}
+.back-btn:hover{color:#2A1C06}
+
+/* ── RESEND ── */
+.resend-row{text-align:center;margin-top:16px;font-size:13px;color:#7A6A4F}
+.resend-btn{color:#8B6914;cursor:pointer;font-weight:500;border:none;background:none;font-family:'Jost',sans-serif;font-size:13px}
+.resend-btn:disabled{color:#B5A88C;cursor:default}
+
+/* ── VERIFICATION BADGE ── */
+.verify-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(39,174,96,.08);
+  border:.5px solid rgba(39,174,96,.25);border-radius:2px;
+  padding:4px 10px;font-size:11px;font-weight:500;
+  color:#1A7A4F;letter-spacing:.06em;text-transform:uppercase;
+  margin-bottom:16px;
+}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;bottom:28px;left:50%;
+  transform:translateX(-50%) translateY(14px);
+  background:#2A1C06;color:#E8D5A3;
+  padding:11px 20px;border-radius:3px;
+  font-size:13px;font-weight:400;letter-spacing:.02em;
+  z-index:999;opacity:0;transition:opacity .3s,transform .3s;
+  pointer-events:none;white-space:nowrap;border:.5px solid rgba(201,168,76,.25);
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.error{background:#7A1515;border-color:rgba(255,100,100,.2)}
+
+/* ── PROGRESS STEPPER ── */
+.stepper{display:flex;align-items:center;margin-bottom:28px;gap:0}
+.step-item{display:flex;align-items:center;gap:0;flex:1}
+.step-item:last-child{flex:0}
+.step-circle{
+  width:28px;height:28px;border-radius:50%;
+  border:.5px solid rgba(139,105,20,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:500;color:#B5A88C;
+  background:#fff;flex-shrink:0;transition:all .3s;
+}
+.step-circle.done{background:#2A1C06;color:#E8D5A3;border-color:#2A1C06}
+.step-circle.active{background:#C9A84C;color:#0C0902;border-color:#C9A84C}
+.step-label{font-size:10px;color:#B5A88C;margin-top:4px;white-space:nowrap;letter-spacing:.04em}
+.step-item-wrap{display:flex;flex-direction:column;align-items:center}
+.step-connector{flex:1;height:.5px;background:rgba(139,105,20,.2);margin:0 4px;margin-bottom:20px}
+.step-connector.done{background:#2A1C06}
+
+/* ── FIELD GROUP CARD ── */
+.field-card{
+  background:#fff;border:.5px solid rgba(139,105,20,.15);
+  border-radius:4px;padding:18px 18px 6px;margin-bottom:18px;
+}
+.field-card-label{
+  font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  color:#B5A88C;margin-bottom:14px;
+}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  .panel-left{display:none}
+  .panel-right{padding:32px 24px;align-items:flex-start;padding-top:60px}
+  .auth-box{max-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- LEFT DECORATIVE PANEL -->
+  <div class="panel-left">
+    <div class="panel-bg-text">ሃ</div>
+    <a class="panel-logo" href="/">Hassabe</a>
+
+    <div class="panel-body">
+      <h2>Intentional<br>matching for<br><em>our people</em></h2>
+      <p>No swiping. Two rounds of deep compatibility. AI-powered insights rooted in East African values.</p>
+      <div class="panel-pills">
+        <div class="panel-pill">
+          <div class="pill-icon">◆</div>
+          <div class="pill-text"><strong>Two-round matching</strong>Deep questionnaires before any introduction</div>
+        </div>
+        <div class="panel-pill">
+          <div class="pill-icon">✦</div>
+          <div class="pill-text"><strong>Culturally rooted</strong>Faith, heritage, and family values at the core</div>
+        </div>
+        <div class="panel-pill">
+          <div class="pill-icon">◈</div>
+          <div class="pill-text"><strong>Privacy first</strong>Your data is encrypted and never shared</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-footer">© 2025 Hassabe Inc. · ሃሳቤ</div>
+  </div>
+
+  <!-- RIGHT AUTH PANEL -->
+  <div class="panel-right">
+    <div class="auth-box">
+
+      <!-- ════════════════════════════
+           SCREEN: SIGNUP
+      ════════════════════════════ -->
+      <div id="screen-signup" class="screen active">
+        <div class="stepper">
+          <div class="step-item">
+            <div class="step-item-wrap"><div class="step-circle active">1</div><div class="step-label">Account</div></div>
+            <div class="step-connector"></div>
+          </div>
+          <div class="step-item">
+            <div class="step-item-wrap"><div class="step-circle">2</div><div class="step-label">Verify</div></div>
+            <div class="step-connector"></div>
+          </div>
+          <div class="step-item-wrap"><div class="step-circle">3</div><div class="step-label">Profile</div></div>
+        </div>
+
+        <h1 class="auth-heading">Create your<br><em>account</em></h1>
+        <p class="auth-sub">Join the Hassabe community — intentional matchmaking for the Ethiopian &amp; Eritrean diaspora.</p>
+
+        <!-- SSO -->
+        <div class="sso-row">
+          <button class="sso-btn" onclick="ssoSignup('google')">
+            <span class="sso-icon">🔵</span> Continue with Google
+          </button>
+          <button class="sso-btn" onclick="ssoSignup('apple')">
+            <span class="sso-icon">⬛</span> Continue with Apple
+          </button>
+        </div>
+        <div class="or-divider">or sign up with email</div>
+
+        <!-- Auth method tabs -->
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="switchSignupTab('email', this)">Email</button>
+          <button class="auth-tab" onclick="switchSignupTab('phone', this)">Phone number</button>
+        </div>
+
+        <!-- Email fields -->
+        <div id="signup-email-fields">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input class="form-input" id="su-name" type="text" placeholder="Your full name" autocomplete="name">
+            <div class="field-error" id="err-su-name">Please enter your name</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input class="form-input" id="su-email" type="email" placeholder="you@example.com" autocomplete="email">
+            <div class="field-error" id="err-su-email">Please enter a valid email</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <div class="input-wrap">
+              <input class="form-input" id="su-password" type="password" placeholder="Minimum 8 characters" autocomplete="new-password" oninput="checkPasswordStrength(this.value)">
+              <button class="pw-toggle" onclick="togglePw('su-password',this)" type="button">👁</button>
+            </div>
+            <div class="pw-strength" id="pw-strength" style="display:none">
+              <div class="pw-strength-bars">
+                <div class="pw-bar" id="bar1"></div><div class="pw-bar" id="bar2"></div>
+                <div class="pw-bar" id="bar3"></div><div class="pw-bar" id="bar4"></div>
+              </div>
+              <div class="pw-strength-label" id="pw-label">Enter a password</div>
+            </div>
+            <div class="field-error" id="err-su-password">Password must be at least 8 characters</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm Password</label>
+            <div class="input-wrap">
+              <input class="form-input" id="su-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
+              <button class="pw-toggle" onclick="togglePw('su-confirm',this)" type="button">👁</button>
+            </div>
+            <div class="field-error" id="err-su-confirm">Passwords do not match</div>
+          </div>
+        </div>
+
+        <!-- Phone fields -->
+        <div id="signup-phone-fields" style="display:none">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input class="form-input" id="su-name-phone" type="text" placeholder="Your full name" autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <div class="phone-row">
+              <select class="phone-prefix" id="su-prefix">
+                <option value="+1">🇨🇦 +1</option>
+                <option value="+1">🇺🇸 +1</option>
+                <option value="+44">🇬🇧 +44</option>
+                <option value="+46">🇸🇪 +46</option>
+                <option value="+47">🇳🇴 +47</option>
+                <option value="+61">🇦🇺 +61</option>
+                <option value="+251">🇪🇹 +251</option>
+                <option value="+291">🇪🇷 +291</option>
+              </select>
+              <input class="form-input" id="su-phone" type="tel" placeholder="(555) 000-0000" style="flex:1" autocomplete="tel">
+            </div>
+          </div>
+        </div>
+
+        <div class="check-row">
+          <div class="check-box" id="terms-check" onclick="toggleCheck('terms-check')"></div>
+          <div class="check-label" onclick="toggleCheck('terms-check')">
+            I agree to Hassabe's <a href="#" onclick="return false">Terms of Service</a> and <a href="#" onclick="return false">Privacy Policy</a>. I understand my data is encrypted and never shared with third parties.
+          </div>
+        </div>
+        <div class="field-error" id="err-terms">Please agree to continue</div>
+
+        <button class="btn btn-primary" id="btn-signup" onclick="doSignup()">
+          <span class="btn-text">Create Account</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <div class="auth-link">Already have an account? <span onclick="showScreen('screen-login')">Sign in</span></div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: VERIFY EMAIL
+      ════════════════════════════ -->
+      <div id="screen-verify-email" class="screen">
+        <div class="stepper">
+          <div class="step-item">
+            <div class="step-item-wrap"><div class="step-circle done">✓</div><div class="step-label">Account</div></div>
+            <div class="step-connector done"></div>
+          </div>
+          <div class="step-item">
+            <div class="step-item-wrap"><div class="step-circle active">2</div><div class="step-label">Verify</div></div>
+            <div class="step-connector"></div>
+          </div>
+          <div class="step-item-wrap"><div class="step-circle">3</div><div class="step-label">Profile</div></div>
+        </div>
+
+        <h1 class="auth-heading">Check your<br><em>email</em></h1>
+        <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address">you@example.com</strong>. Enter it below to verify your account.</p>
+
+        <div class="otp-group">
+          <input class="otp-input" type="text" maxlength="1" id="otp0" oninput="otpInput(this,0)" onkeydown="otpKey(this,0,event)">
+          <input class="otp-input" type="text" maxlength="1" id="otp1" oninput="otpInput(this,1)" onkeydown="otpKey(this,1,event)">
+          <input class="otp-input" type="text" maxlength="1" id="otp2" oninput="otpInput(this,2)" onkeydown="otpKey(this,2,event)">
+          <input class="otp-input" type="text" maxlength="1" id="otp3" oninput="otpInput(this,3)" onkeydown="otpKey(this,3,event)">
+          <input class="otp-input" type="text" maxlength="1" id="otp4" oninput="otpInput(this,4)" onkeydown="otpKey(this,4,event)">
+          <input class="otp-input" type="text" maxlength="1" id="otp5" oninput="otpInput(this,5)" onkeydown="otpKey(this,5,event)">
+        </div>
+        <div class="field-error" id="err-otp" style="text-align:center">Incorrect code. Please try again.</div>
+
+        <button class="btn btn-primary" id="btn-verify" onclick="doVerifyEmail()">
+          <span class="btn-text">Verify Email</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <div class="resend-row">
+          Didn't receive it? <button class="resend-btn" id="resend-btn" onclick="resendCode()" disabled>Resend in <span id="resend-timer">60</span>s</button>
+        </div>
+
+        <div class="auth-link" style="margin-top:12px"><span onclick="showScreen('screen-signup')">← Change email address</span></div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: VERIFY PHONE
+      ════════════════════════════ -->
+      <div id="screen-verify-phone" class="screen">
+        <button class="back-btn" onclick="showScreen('screen-signup')">← Back</button>
+        <h1 class="auth-heading">Verify your<br><em>phone</em></h1>
+        <p class="auth-sub">We sent a 6-digit code via SMS to <strong id="verify-phone-num">+1 555 000 0000</strong>.</p>
+
+        <div class="otp-group">
+          <input class="otp-input" type="text" maxlength="1" id="potp0" oninput="otpInput(this,0,'p')" onkeydown="otpKey(this,0,event,'p')">
+          <input class="otp-input" type="text" maxlength="1" id="potp1" oninput="otpInput(this,1,'p')" onkeydown="otpKey(this,1,event,'p')">
+          <input class="otp-input" type="text" maxlength="1" id="potp2" oninput="otpInput(this,2,'p')" onkeydown="otpKey(this,2,event,'p')">
+          <input class="otp-input" type="text" maxlength="1" id="potp3" oninput="otpInput(this,3,'p')" onkeydown="otpKey(this,3,event,'p')">
+          <input class="otp-input" type="text" maxlength="1" id="potp4" oninput="otpInput(this,4,'p')" onkeydown="otpKey(this,4,event,'p')">
+          <input class="otp-input" type="text" maxlength="1" id="potp5" oninput="otpInput(this,5,'p')" onkeydown="otpKey(this,5,event,'p')">
+        </div>
+
+        <button class="btn btn-primary" onclick="doVerifyPhone()">
+          <span class="btn-text">Verify Phone</span>
+          <div class="btn-spinner"></div>
+        </button>
+        <div class="resend-row">Didn't get it? <button class="resend-btn">Resend SMS</button></div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: ACCOUNT CREATED
+      ════════════════════════════ -->
+      <div id="screen-verified" class="screen">
+        <div class="success-wrap">
+          <div class="success-icon">✓</div>
+          <div class="verify-badge">✓ &nbsp;Verified</div>
+          <h2>Account created!</h2>
+          <p>Your email is verified and your account is active. Now let's build your Hassabe profile — it takes about 8 minutes.</p>
+          <button class="btn btn-gold" onclick="goToOnboarding()">
+            <span class="btn-text">Build My Profile →</span>
+          </button>
+          <div class="auth-link" style="margin-top:16px"><span onclick="showScreen('screen-login')">Sign in instead</span></div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: LOGIN
+      ════════════════════════════ -->
+      <div id="screen-login" class="screen">
+        <h1 class="auth-heading">Welcome<br><em>back</em></h1>
+        <p class="auth-sub">Sign in to your Hassabe account.</p>
+
+        <div class="sso-row">
+          <button class="sso-btn" onclick="ssoLogin('google')">
+            <span class="sso-icon">🔵</span> Google
+          </button>
+          <button class="sso-btn" onclick="ssoLogin('apple')">
+            <span class="sso-icon">⬛</span> Apple
+          </button>
+        </div>
+        <div class="or-divider">or sign in with email</div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input class="form-input" id="login-email" type="email" placeholder="you@example.com" autocomplete="email">
+          <div class="field-error" id="err-login-email">Please enter your email</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <div class="input-wrap">
+            <input class="form-input" id="login-password" type="password" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+            <button class="pw-toggle" onclick="togglePw('login-password',this)" type="button">👁</button>
+          </div>
+          <div class="field-error" id="err-login-password">Incorrect email or password</div>
+        </div>
+
+        <div style="text-align:right;margin-bottom:20px;margin-top:-8px">
+          <span onclick="showScreen('screen-forgot')" style="font-size:12.5px;color:#8B6914;cursor:pointer;font-weight:500">Forgot password?</span>
+        </div>
+
+        <button class="btn btn-primary" id="btn-login" onclick="doLogin()">
+          <span class="btn-text">Sign In</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <div class="auth-link" style="margin-top:20px">New to Hassabe? <span onclick="showScreen('screen-signup')">Create an account</span></div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: 2FA CHALLENGE
+      ════════════════════════════ -->
+      <div id="screen-2fa" class="screen">
+        <button class="back-btn" onclick="showScreen('screen-login')">← Back to login</button>
+        <h1 class="auth-heading">Two-factor<br><em>verification</em></h1>
+        <p class="auth-sub">Enter the 6-digit code from your authenticator app (Google Authenticator, Authy, etc.).</p>
+
+        <div class="otp-group">
+          <input class="otp-input" type="text" maxlength="1" id="tfa0" oninput="otpInput(this,0,'t')" onkeydown="otpKey(this,0,event,'t')">
+          <input class="otp-input" type="text" maxlength="1" id="tfa1" oninput="otpInput(this,1,'t')" onkeydown="otpKey(this,1,event,'t')">
+          <input class="otp-input" type="text" maxlength="1" id="tfa2" oninput="otpInput(this,2,'t')" onkeydown="otpKey(this,2,event,'t')">
+          <input class="otp-input" type="text" maxlength="1" id="tfa3" oninput="otpInput(this,3,'t')" onkeydown="otpKey(this,3,event,'t')">
+          <input class="otp-input" type="text" maxlength="1" id="tfa4" oninput="otpInput(this,4,'t')" onkeydown="otpKey(this,4,event,'t')">
+          <input class="otp-input" type="text" maxlength="1" id="tfa5" oninput="otpInput(this,5,'t')" onkeydown="otpKey(this,5,event,'t')">
+        </div>
+        <div class="field-error" id="err-tfa" style="text-align:center">Incorrect code. Check your authenticator app.</div>
+
+        <button class="btn btn-primary" onclick="doVerify2FA()">
+          <span class="btn-text">Verify Code</span>
+          <div class="btn-spinner"></div>
+        </button>
+
+        <div class="auth-link" style="margin-top:16px">Lost access to your app? <span onclick="showToast('Recovery email sent','')">Use recovery code</span></div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: FORGOT PASSWORD
+      ════════════════════════════ -->
+      <div id="screen-forgot" class="screen">
+        <button class="back-btn" onclick="showScreen('screen-login')">← Back to sign in</button>
+        <h1 class="auth-heading">Reset your<br><em>password</em></h1>
+        <p class="auth-sub">Enter your email address and we'll send you a secure link to reset your password.</p>
+
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input class="form-input" id="forgot-email" type="email" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')doForgot()">
+          <div class="field-error" id="err-forgot-email">Please enter a valid email</div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-forgot" onclick="doForgot()">
+          <span class="btn-text">Send Reset Link</span>
+          <div class="btn-spinner"></div>
+        </button>
+        <div class="auth-link"><span onclick="showScreen('screen-login')">← Back to sign in</span></div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: CHECK EMAIL (RESET)
+      ════════════════════════════ -->
+      <div id="screen-check-email" class="screen">
+        <div class="success-wrap">
+          <div class="success-icon">✉️</div>
+          <h2>Check your email</h2>
+          <p>We sent a password reset link to <strong id="reset-email-shown">you@example.com</strong>. The link expires in 1 hour.</p>
+          <button class="btn btn-outline" onclick="showScreen('screen-login')">← Back to sign in</button>
+          <div class="resend-row" style="margin-top:16px">Didn't get it? <button class="resend-btn" onclick="doForgot()">Resend link</button></div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: RESET PASSWORD
+      ════════════════════════════ -->
+      <div id="screen-reset" class="screen">
+        <h1 class="auth-heading">New<br><em>password</em></h1>
+        <p class="auth-sub">Choose a strong password for your Hassabe account.</p>
+
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <div class="input-wrap">
+            <input class="form-input" id="reset-pw" type="password" placeholder="Minimum 8 characters" autocomplete="new-password" oninput="checkPasswordStrength(this.value,'r')">
+            <button class="pw-toggle" onclick="togglePw('reset-pw',this)" type="button">👁</button>
+          </div>
+          <div class="pw-strength" id="pw-strength-r" style="display:none">
+            <div class="pw-strength-bars">
+              <div class="pw-bar" id="rbar1"></div><div class="pw-bar" id="rbar2"></div>
+              <div class="pw-bar" id="rbar3"></div><div class="pw-bar" id="rbar4"></div>
+            </div>
+            <div class="pw-strength-label" id="rpw-label"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <div class="input-wrap">
+            <input class="form-input" id="reset-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
+            <button class="pw-toggle" onclick="togglePw('reset-confirm',this)" type="button">👁</button>
+          </div>
+          <div class="field-error" id="err-reset-confirm">Passwords do not match</div>
+        </div>
+
+        <button class="btn btn-primary" onclick="doReset()">
+          <span class="btn-text">Update Password</span>
+          <div class="btn-spinner"></div>
+        </button>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: SETUP 2FA
+      ════════════════════════════ -->
+      <div id="screen-setup-2fa" class="screen">
+        <button class="back-btn" onclick="showScreen('screen-verified')">← Skip for now</button>
+        <h1 class="auth-heading">Add two-factor<br><em>auth</em></h1>
+        <p class="auth-sub">Optional but recommended. Protect your account with an authenticator app.</p>
+
+        <div class="tfa-qr">
+          <div class="tfa-qr-placeholder">QR Code<br>(generated by backend)</div>
+          <div style="font-size:12px;color:#7A6A4F;margin-bottom:8px">Scan with Google Authenticator or Authy</div>
+          <div style="font-size:11px;color:#B5A88C">Or enter manually:</div>
+          <div class="tfa-secret" onclick="copySecret()" title="Click to copy">HASA BE12 ABCD EFGH</div>
+          <div style="font-size:11px;color:#B5A88C">Click to copy secret key</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Enter the 6-digit code to confirm</label>
+          <input class="form-input" id="tfa-confirm-code" type="text" placeholder="000000" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:.2em;font-family:'Cormorant Garamond',serif">
+        </div>
+
+        <button class="btn btn-primary" onclick="doConfirm2FA()">
+          <span class="btn-text">Enable 2FA</span>
+          <div class="btn-spinner"></div>
+        </button>
+        <div class="auth-link"><span onclick="goToOnboarding()">Set up later</span></div>
+      </div>
+
+      <!-- ════════════════════════════
+           SCREEN: LOGGED IN / DASHBOARD ENTRY
+      ════════════════════════════ -->
+      <div id="screen-loggedin" class="screen">
+        <div class="success-wrap">
+          <div class="success-icon">👤</div>
+          <div class="verify-badge">✓ &nbsp;Authenticated</div>
+          <h2>You're in</h2>
+          <p id="loggedin-name">Welcome back, <strong>Selam</strong>. Your Hassabe account is active and your session is secure.</p>
+          <button class="btn btn-gold" onclick="showToast('Navigating to your matches...','')">
+            <span class="btn-text">Go to My Matches →</span>
+          </button>
+          <div style="margin-top:20px;padding:14px;background:#f7f1e8;border-radius:4px;text-align:left">
+            <div style="font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:#B5A88C;margin-bottom:8px">Session Info</div>
+            <div style="font-size:12px;color:#7A6A4F;line-height:1.8">
+              JWT Token: <span style="font-family:monospace;color:#8B6914">eyJhbGci...stored</span><br>
+              Expires: <span style="color:#2A1C06">24 hours</span><br>
+              Refresh token: <span style="color:#2A1C06">30 days</span>
+            </div>
+          </div>
+          <div class="auth-link" style="margin-top:16px"><span onclick="showScreen('screen-login')">Sign out</span></div>
+        </div>
+      </div>
+
+    </div><!-- /auth-box -->
+  </div><!-- /panel-right -->
+</div><!-- /shell -->
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ── STATE ── */
+let signupData = {};
+let resendInterval = null;
+
+/* ── SCREEN NAVIGATION ── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('active');
+    // Scroll to top of auth box
+    document.querySelector('.panel-right').scrollTop = 0;
+  }
+}
+
+/* ── TOGGLE HELPERS ── */
+function switchSignupTab(mode, btn) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('signup-email-fields').style.display = mode === 'email' ? 'block' : 'none';
+  document.getElementById('signup-phone-fields').style.display  = mode === 'phone'  ? 'block' : 'none';
+}
+
+function togglePw(id, btn) {
+  const inp = document.getElementById(id);
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? '🙈' : '👁';
+}
+
+function toggleCheck(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('checked');
+  el.textContent = el.classList.contains('checked') ? '✓' : '';
+  document.getElementById('err-terms').classList.remove('show');
+}
+
+/* ── PASSWORD STRENGTH ── */
+function checkPasswordStrength(pw, prefix = '') {
+  const p = prefix;
+  const wrap = document.getElementById(`pw-strength${p ? '-' + p : ''}`);
+  if (!wrap) return;
+  wrap.style.display = pw.length ? 'block' : 'none';
+  const bars = [1,2,3,4].map(n => document.getElementById(`${p || ''}bar${n}`));
+  const label = document.getElementById(`${p ? p + 'pw' : 'pw'}-label`);
+
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  const levels = ['', 'weak', 'fair', 'good', 'strong'];
+  const labels = ['', 'Weak', 'Fair', 'Good', 'Strong — great choice'];
+  bars.forEach((b, i) => {
+    b.className = 'pw-bar';
+    if (i < score) b.classList.add(levels[score]);
+  });
+  if (label) label.textContent = labels[score] || 'Keep going...';
+}
+
+/* ── OTP INPUT ── */
+function otpInput(el, idx, prefix = '') {
+  const p = prefix;
+  const val = el.value.replace(/\D/g, '');
+  el.value = val;
+  if (val) {
+    el.classList.add('filled');
+    const next = document.getElementById(`${p}otp${idx+1}`) || document.getElementById(`${p}tfa${idx+1}`);
+    if (next) next.focus();
+  } else {
+    el.classList.remove('filled');
+  }
+}
+
+function otpKey(el, idx, e, prefix = '') {
+  const p = prefix;
+  if (e.key === 'Backspace' && !el.value) {
+    const prev = document.getElementById(`${p}otp${idx-1}`) || document.getElementById(`${p}tfa${idx-1}`);
+    if (prev) { prev.value = ''; prev.classList.remove('filled'); prev.focus(); }
+  }
+  if (e.key === 'ArrowLeft' && idx > 0) {
+    const prev = document.getElementById(`${p}otp${idx-1}`) || document.getElementById(`${p}tfa${idx-1}`);
+    if (prev) prev.focus();
+  }
+  if (e.key === 'ArrowRight') {
+    const next = document.getElementById(`${p}otp${idx+1}`) || document.getElementById(`${p}tfa${idx+1}`);
+    if (next) next.focus();
+  }
+}
+
+function getOtpValue(prefix = '') {
+  const p = prefix;
+  let val = '';
+  for (let i = 0; i < 6; i++) {
+    const el = document.getElementById(`${p}otp${i}`) || document.getElementById(`${p}tfa${i}`);
+    if (el) val += el.value;
+  }
+  return val;
+}
+
+function clearOtp(prefix = '') {
+  const p = prefix;
+  for (let i = 0; i < 6; i++) {
+    const el = document.getElementById(`${p}otp${i}`) || document.getElementById(`${p}tfa${i}`);
+    if (el) { el.value = ''; el.classList.remove('filled'); }
+  }
+}
+
+/* ── FIELD VALIDATION ── */
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (msg) el.textContent = msg;
+  el.classList.add('show');
+  const inp = el.previousElementSibling?.tagName === 'INPUT' ? el.previousElementSibling :
+              el.previousElementSibling?.querySelector('input');
+  if (inp) inp.classList.add('error');
+}
+
+function clearErr(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('show');
+}
+
+function setLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.classList.toggle('loading', loading);
+  btn.disabled = loading;
+}
+
+/* ── SIGN UP ── */
+async function doSignup() {
+  let valid = true;
+  clearErr('err-su-name'); clearErr('err-su-email');
+  clearErr('err-su-password'); clearErr('err-su-confirm'); clearErr('err-terms');
+
+  const isEmail = document.getElementById('signup-email-fields').style.display !== 'none';
+
+  const name     = isEmail ? document.getElementById('su-name').value.trim() : document.getElementById('su-name-phone').value.trim();
+  const email    = document.getElementById('su-email')?.value?.trim();
+  const phone    = document.getElementById('su-phone')?.value?.trim();
+  const pw       = document.getElementById('su-password')?.value;
+  const confirm  = document.getElementById('su-confirm')?.value;
+  const terms    = document.getElementById('terms-check')?.classList?.contains('checked');
+
+  if (!name) { showErr('err-su-name', 'Please enter your full name'); valid = false; }
+  if (isEmail) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErr('err-su-email', 'Please enter a valid email'); valid = false; }
+    if (!pw || pw.length < 8) { showErr('err-su-password', 'Password must be at least 8 characters'); valid = false; }
+    if (pw !== confirm) { showErr('err-su-confirm', 'Passwords do not match'); valid = false; }
+  }
+  if (!terms) { showErr('err-terms', 'Please agree to the Terms of Service to continue'); valid = false; }
+  if (!valid) return;
+
+  signupData = { name, email, phone, method: isEmail ? 'email' : 'phone' };
+
+  setLoading('btn-signup', true);
+
+  /* ──────────────────────────────────────────────
+     PRODUCTION: Replace this block with your API call
+     const res = await fetch('/api/auth/register', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ name, email, password: pw })
+     });
+     const data = await res.json();
+     if (!res.ok) { showErr('err-su-email', data.message); setLoading(..., false); return; }
+  ────────────────────────────────────────────── */
+  await sleep(1200); // simulate API call
+  setLoading('btn-signup', false);
+
+  if (isEmail) {
+    document.getElementById('verify-email-address').textContent = email;
+    document.getElementById('verify-email-desc').innerHTML =
+      `We sent a 6-digit code to <strong>${email}</strong>. Enter it below.`;
+    showScreen('screen-verify-email');
+    startResendTimer();
+    document.getElementById('otp0')?.focus();
+  } else {
+    const prefix = document.getElementById('su-prefix')?.value || '+1';
+    document.getElementById('verify-phone-num').textContent = `${prefix} ${phone}`;
+    showScreen('screen-verify-phone');
+    document.getElementById('potp0')?.focus();
+  }
+}
+
+/* ── VERIFY EMAIL ── */
+async function doVerifyEmail() {
+  clearErr('err-otp');
+  const code = getOtpValue('');
+  if (code.length < 6) { showErr('err-otp', 'Please enter the complete 6-digit code'); return; }
+
+  setLoading('btn-verify', true);
+
+  const res = await fetch('/api/auth/verify-email', {
+       method: 'POST', headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ email: signupData.email, code })
+     });
+  await sleep(1000);
+  setLoading('btn-verify', false);
+
+  // Demo: accept 123456 or any 6-digit code
+  if (code === '000000') {
+    showErr('err-otp', 'Incorrect code. Try 123456 for the demo.');
+    clearOtp('');
+    document.getElementById('otp0')?.focus();
+    return;
+  }
+
+  clearResendTimer();
+  showScreen('screen-verified');
+  showToast('✓ Email verified successfully');
+}
+
+function doVerifyPhone() {
+  showScreen('screen-verified');
+  showToast('✓ Phone verified successfully');
+}
+
+/* ── LOGIN ── */
+async function doLogin() {
+  clearErr('err-login-email'); clearErr('err-login-password');
+
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-password').value;
+
+  let valid = true;
+  if (!email) { showErr('err-login-email', 'Please enter your email'); valid = false; }
+  if (!pw)    { showErr('err-login-password', 'Please enter your password'); valid = false; }
+  if (!valid) return;
+
+  setLoading('btn-login', true);
+
+  const res = await fetch('/api/auth/login', {
+       method: 'POST', headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ email, password: pw })
+     });
+     const data = await res.json();
+     if (!res.ok) { showErr('err-login-password', data.message); setLoading('btn-login', false); return; }
+     localStorage.setItem('hassabe_token', data.accessToken);
+     localStorage.setItem('hassabe_refresh', data.refreshToken);
+     if (data.requires2FA) { showScreen('screen-2fa'); return; }
+  await sleep(1200);
+  setLoading('btn-login', false);
+
+  // Demo: show 2FA for "2fa@example.com", otherwise go to dashboard
+  if (email.includes('2fa')) {
+    showScreen('screen-2fa');
+    document.getElementById('tfa0')?.focus();
+  } else {
+    const firstName = email.split('@')[0].split('.')[0];
+    document.getElementById('loggedin-name').innerHTML =
+      `Welcome back, <strong>${capitalize(firstName)}</strong>. Your Hassabe account is active and your session is secure.`;
+    showScreen('screen-loggedin');
+    showToast('✓ Signed in successfully');
+  }
+}
+
+/* ── 2FA VERIFY ── */
+async function doVerify2FA() {
+  clearErr('err-tfa');
+  const code = getOtpValue('t');
+  if (code.length < 6) { showErr('err-tfa', 'Enter all 6 digits'); return; }
+
+  await sleep(800);
+
+  if (code === '000000') {
+    showErr('err-tfa', 'Incorrect code. Check your authenticator app.');
+    clearOtp('t');
+    document.getElementById('tfa0')?.focus();
+    return;
+  }
+
+  showScreen('screen-loggedin');
+  showToast('✓ 2FA verified — signed in');
+}
+
+/* ── FORGOT PASSWORD ── */
+async function doForgot() {
+  clearErr('err-forgot-email');
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showErr('err-forgot-email', 'Please enter a valid email address');
+    return;
+  }
+
+  setLoading('btn-forgot', true);
+
+  await fetch('/api/auth/forgot-password', {
+       method:'POST', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({ email })
+     });
+  await sleep(1000);
+  setLoading('btn-forgot', false);
+
+  document.getElementById('reset-email-shown').textContent = email;
+  showScreen('screen-check-email');
+}
+
+/* ── RESET PASSWORD ── */
+async function doReset() {
+  clearErr('err-reset-confirm');
+  const pw      = document.getElementById('reset-pw').value;
+  const confirm = document.getElementById('reset-confirm').value;
+
+  if (!pw || pw.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
+  if (pw !== confirm) { showErr('err-reset-confirm', 'Passwords do not match'); return; }
+
+  const token = new URLSearchParams(window.location.search).get('token');
+     await fetch('/api/auth/reset-password', {
+       method:'POST', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({ token, password: pw })
+     });
+  await sleep(900);
+  showToast('✓ Password updated successfully');
+  setTimeout(() => showScreen('screen-login'), 1000);
+}
+
+/* ── 2FA SETUP ── */
+function copySecret() {
+  navigator.clipboard.writeText('HASSABE12ABCDEFGH')
+    .then(() => showToast('Secret key copied'));
+}
+
+async function doConfirm2FA() {
+  const code = document.getElementById('tfa-confirm-code').value.trim();
+  if (code.length !== 6) { showToast('Enter the 6-digit code from your app', 'error'); return; }
+  await sleep(700);
+  showToast('✓ Two-factor auth enabled');
+  setTimeout(() => goToOnboarding(), 800);
+}
+
+/* ── SSO ── */
+async function ssoSignup(provider) {
+  showToast(`Opening ${capitalize(provider)} sign-in...`);
+  window.location.href = `/api/auth/${provider}`;
+     OR with Firebase:
+     const result = await signInWithPopup(auth, provider === 'google' ? googleProvider : appleProvider);
+     const token = await result.user.getIdToken();
+  await sleep(800);
+  showScreen('screen-verified');
+  showToast(`✓ Signed up with ${capitalize(provider)}`);
+}
+
+async function ssoLogin(provider) {
+  showToast(`Opening ${capitalize(provider)} sign-in...`);
+  await sleep(800);
+  showScreen('screen-loggedin');
+  showToast(`✓ Signed in with ${capitalize(provider)}`);
+}
+
+/* ── RESEND TIMER ── */
+function startResendTimer() {
+  let seconds = 60;
+  const btn = document.getElementById('resend-btn');
+  const timer = document.getElementById('resend-timer');
+  if (!btn || !timer) return;
+  btn.disabled = true;
+  resendInterval = setInterval(() => {
+    seconds--;
+    timer.textContent = seconds;
+    if (seconds <= 0) {
+      clearInterval(resendInterval);
+      btn.disabled = false;
+      btn.textContent = 'Resend code';
+    }
+  }, 1000);
+}
+
+function clearResendTimer() {
+  if (resendInterval) clearInterval(resendInterval);
+}
+
+function resendCode() {
+  clearOtp('');
+  document.getElementById('otp0')?.focus();
+  startResendTimer();
+  showToast('New code sent to your email');
+}
+
+/* ── ONBOARDING REDIRECT ── */
+function goToOnboarding() {
+  showToast('Taking you to profile setup...');
+  window.location.href = '/onboarding';
+  setTimeout(() => {
+    showToast('In production: redirects to /onboarding');
+  }, 1200);
+}
+
+/* ── HELPERS ── */
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; }
+
+let toastT;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type === 'error' ? ' error' : '');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

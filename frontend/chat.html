@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="/js/config.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Hassabe — Conversation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antialiased;background:#FDF8F0;overflow:hidden}
+
+/* ── SHELL ── */
+.shell{display:flex;height:100vh;overflow:hidden}
+
+/* ══ CONVERSATION LIST (left sidebar) ══ */
+.conv-list{
+  width:280px;flex-shrink:0;background:#fff;
+  border-right:.5px solid rgba(139,105,20,.12);
+  display:flex;flex-direction:column;
+}
+.conv-header{
+  padding:20px 18px 16px;border-bottom:.5px solid rgba(139,105,20,.1);
+  flex-shrink:0;
+}
+.conv-header h2{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:#2A1C06}
+.conv-header p{font-size:11px;color:#B5A88C;letter-spacing:.04em;margin-top:2px}
+.conv-items{flex:1;overflow-y:auto}
+.conv-item{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 18px;cursor:pointer;
+  border-bottom:.5px solid rgba(139,105,20,.06);
+  transition:background .15s;position:relative;
+}
+.conv-item:hover{background:rgba(201,168,76,.04)}
+.conv-item.active{background:rgba(201,168,76,.07)}
+.conv-av{
+  width:46px;height:46px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(201,168,76,.25),rgba(201,168,76,.06));
+  border:1.5px solid rgba(201,168,76,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:#C9A84C;
+  overflow:hidden;position:relative;
+}
+.conv-av img{width:100%;height:100%;object-fit:cover}
+.conv-av .online-dot{
+  position:absolute;bottom:1px;right:1px;
+  width:10px;height:10px;border-radius:50%;
+  background:#27AE60;border:2px solid #fff;
+}
+.conv-body{flex:1;min-width:0}
+.conv-name{font-size:13.5px;font-weight:500;color:#2A1C06;margin-bottom:2px}
+.conv-preview{font-size:12px;color:#9A8A72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.conv-time{font-size:10px;color:#B5A88C}
+.conv-badge{width:18px;height:18px;border-radius:50%;background:#C9A84C;color:#0C0902;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* ══ CHAT PANEL (right) ══ */
+.chat-panel{flex:1;display:flex;flex-direction:column;min-width:0;background:#FDF8F0}
+
+/* ── Chat header ── */
+.chat-header{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 22px;background:#fff;
+  border-bottom:.5px solid rgba(139,105,20,.1);flex-shrink:0;
+  position:relative;z-index:10;
+}
+.chat-header-av{
+  width:42px;height:42px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(201,168,76,.25),rgba(201,168,76,.06));
+  border:1.5px solid rgba(201,168,76,.3);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:#C9A84C;
+  overflow:hidden;
+}
+.chat-header-av img{width:100%;height:100%;object-fit:cover}
+.chat-header-info{flex:1}
+.chat-header-name{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;color:#2A1C06}
+.chat-header-sub{font-size:11px;color:#9A8A72;display:flex;align-items:center;gap:6px}
+.chat-header-sub .dot{width:6px;height:6px;border-radius:50%;background:#B5A88C;display:inline-block}
+.chat-header-sub .dot.online{background:#27AE60}
+
+/* Expiry bar */
+.expiry-bar{
+  padding:8px 22px;background:rgba(201,168,76,.07);
+  border-bottom:.5px solid rgba(201,168,76,.15);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;color:#8B6914;flex-shrink:0;
+}
+.expiry-bar.urgent{background:rgba(181,72,26,.07);color:#B5481A;border-bottom-color:rgba(181,72,26,.2)}
+.expiry-bar.hidden{display:none}
+.expiry-progress{flex:1;height:2px;background:rgba(201,168,76,.15);border-radius:1px;margin:0 12px;overflow:hidden}
+.expiry-fill{height:100%;background:#C9A84C;border-radius:1px;transition:width 60s linear}
+.expiry-bar.urgent .expiry-fill{background:#B5481A}
+
+/* ── Message area ── */
+.msg-area{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.msg-area::-webkit-scrollbar{width:4px}
+.msg-area::-webkit-scrollbar-thumb{background:rgba(201,168,76,.2);border-radius:2px}
+
+/* Date dividers */
+.date-divider{display:flex;align-items:center;gap:10px;padding:4px 0}
+.date-divider span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#B5A88C;white-space:nowrap}
+.date-divider::before,.date-divider::after{content:'';flex:1;height:.5px;background:rgba(139,105,20,.1)}
+
+/* Bubble groups */
+.msg-group{display:flex;flex-direction:column;gap:3px}
+.msg-group.mine{align-items:flex-end}
+.msg-group.theirs{align-items:flex-start}
+
+.msg-row{display:flex;align-items:flex-end;gap:8px}
+.msg-group.mine .msg-row{flex-direction:row-reverse}
+
+.msg-av{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(201,168,76,.2),rgba(201,168,76,.06));
+  border:1px solid rgba(201,168,76,.25);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cormorant Garamond',serif;font-size:11px;font-weight:600;color:#C9A84C;
+  overflow:hidden;
+}
+.msg-av img{width:100%;height:100%;object-fit:cover}
+.msg-av.spacer{opacity:0;pointer-events:none}
+
+/* Bubbles */
+.bubble{
+  max-width:420px;padding:10px 14px;border-radius:16px;
+  font-size:14px;line-height:1.6;font-weight:300;
+  animation:popIn .2s cubic-bezier(.18,.67,.6,1.22);
+  position:relative;word-break:break-word;
+}
+@keyframes popIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+.msg-group.mine .bubble{
+  background:#2A1C06;color:#E8D5A3;
+  border-radius:16px 16px 4px 16px;
+}
+.msg-group.theirs .bubble{
+  background:#fff;color:#2A1C06;
+  border:.5px solid rgba(139,105,20,.12);
+  border-radius:16px 16px 16px 4px;
+}
+
+/* AI starter bubble */
+.bubble.ai-starter{
+  background:rgba(201,168,76,.08);color:#5A4A2E;
+  border:.5px solid rgba(201,168,76,.2);
+  font-style:italic;
+}
+.bubble.ai-starter::before{content:'✦  ';color:#C9A84C;font-style:normal}
+
+/* Voice bubble */
+.bubble.voice{
+  padding:10px 14px;
+  display:flex;align-items:center;gap:10px;
+  min-width:180px;cursor:pointer;
+}
+.voice-play{
+  width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;flex-shrink:0;transition:background .15s;
+}
+.msg-group.mine .voice-play{background:rgba(255,255,255,.1)}
+.msg-group.theirs .voice-play{background:rgba(201,168,76,.1);color:#8B6914}
+.voice-play:hover{opacity:.8}
+.voice-wave{flex:1;display:flex;align-items:center;gap:2px;height:24px}
+.voice-bar{
+  width:3px;border-radius:2px;flex-shrink:0;
+  background:currentColor;opacity:.4;
+  animation:none;
+}
+.voice-bar.playing{animation:waveBounce 0.8s ease-in-out infinite alternate}
+.voice-bar:nth-child(2n){animation-delay:.1s}
+.voice-bar:nth-child(3n){animation-delay:.2s}
+@keyframes waveBounce{from{transform:scaleY(1)}to{transform:scaleY(3)}}
+.voice-duration{font-size:11px;opacity:.6;flex-shrink:0}
+
+/* Read receipt */
+.read-receipt{
+  font-size:10px;color:#B5A88C;
+  display:flex;align-items:center;gap:3px;margin-top:1px;
+}
+.msg-group.mine .read-receipt{justify-content:flex-end}
+.check{color:#C9A84C}
+
+/* Timestamp */
+.msg-time{font-size:10px;color:#B5A88C;margin-top:1px;padding:0 2px}
+.msg-group.mine .msg-time{text-align:right}
+
+/* Sending state */
+.bubble.sending{opacity:.65}
+
+/* ── ICEBREAKERS PANEL ── */
+.icebreakers-panel{
+  background:#fff;border-top:.5px solid rgba(139,105,20,.1);
+  padding:14px 20px;flex-shrink:0;
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.ib-label{
+  font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:rgba(201,168,76,.5);margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.ib-label::after{content:'';flex:1;height:.5px;background:rgba(201,168,76,.15)}
+.ib-chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.ib-chips::-webkit-scrollbar{display:none}
+.ib-chip{
+  padding:8px 14px;border-radius:20px;
+  border:.5px solid rgba(139,105,20,.2);background:#fff;
+  font-size:12.5px;color:#5A4A2E;white-space:nowrap;cursor:pointer;
+  flex-shrink:0;transition:all .18s;line-height:1.4;max-width:260px;white-space:normal;
+  text-align:left;
+}
+.ib-chip:hover{border-color:rgba(201,168,76,.45);background:rgba(201,168,76,.06);color:#2A1C06}
+.ib-dismiss{font-size:11px;color:#B5A88C;background:none;border:none;cursor:pointer;padding:2px;margin-left:4px;font-family:'Jost',sans-serif}
+.ib-dismiss:hover{color:#7A6A4F}
+
+/* ── TYPING INDICATOR ── */
+.typing-wrap{padding:0 22px 8px;flex-shrink:0;min-height:28px}
+.typing-indicator{
+  display:flex;align-items:center;gap:4px;
+  font-size:11px;color:#9A8A72;
+  animation:fadeIn .2s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.typing-dots{display:flex;gap:3px;margin-right:4px}
+.typing-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:#B5A88C;
+  animation:typingPulse 1.4s ease-in-out infinite;
+}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes typingPulse{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-4px);opacity:1}}
+
+/* ── INPUT AREA ── */
+.input-area{
+  padding:12px 18px 16px;background:#fff;
+  border-top:.5px solid rgba(139,105,20,.1);flex-shrink:0;
+}
+.input-row{display:flex;align-items:flex-end;gap:10px}
+.input-box{
+  flex:1;display:flex;align-items:flex-end;
+  background:#FDF8F0;border:.5px solid rgba(139,105,20,.2);
+  border-radius:24px;padding:8px 16px;gap:8px;
+  transition:border-color .2s;
+}
+.input-box:focus-within{border-color:rgba(201,168,76,.45)}
+.msg-input{
+  flex:1;border:none;background:transparent;outline:none;
+  font-family:'Jost',sans-serif;font-size:14px;font-weight:300;color:#2A1C06;
+  resize:none;max-height:120px;line-height:1.5;padding:2px 0;
+  overflow-y:auto;
+}
+.msg-input::placeholder{color:#C0B09A}
+.char-warn{font-size:10px;color:#B5481A;align-self:center;flex-shrink:0;display:none}
+.char-warn.show{display:block}
+
+/* Icon buttons */
+.icon-btn{
+  width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  transition:all .18s;flex-shrink:0;background:transparent;
+}
+.icon-btn:hover{background:rgba(139,105,20,.07)}
+.send-btn{
+  background:#2A1C06;color:#E8D5A3;width:42px;height:42px;border-radius:50%;
+  border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:15px;transition:background .18s;flex-shrink:0;
+}
+.send-btn:hover{background:#1A1005}
+.send-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Recording state */
+.recording-bar{
+  display:none;align-items:center;gap:10px;
+  padding:10px 16px;background:rgba(181,72,26,.06);
+  border-radius:24px;border:.5px solid rgba(181,72,26,.2);
+  font-size:13px;color:#B5481A;
+}
+.recording-bar.active{display:flex}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:#B5481A;animation:recPulse 1s ease-in-out infinite}
+@keyframes recPulse{0%,100%{opacity:1}50%{opacity:.3}}
+.rec-time{font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:#B5481A;flex:1}
+.rec-cancel{font-size:12px;color:#9A8A72;background:none;border:none;cursor:pointer;font-family:'Jost',sans-serif}
+.rec-send{background:#B5481A;color:#fff;border:none;padding:6px 14px;border-radius:12px;font-size:12px;cursor:pointer;font-family:'Jost',sans-serif;font-weight:500}
+
+/* ── EMPTY / LOADING STATES ── */
+.empty-chat{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:40px 24px;text-align:center;
+}
+.empty-icon{font-size:40px;margin-bottom:14px;opacity:.4}
+.empty-h{font-family:'Cormorant Garamond',serif;font-size:22px;color:#2A1C06;margin-bottom:6px}
+.empty-p{font-size:13px;color:#9A8A72;line-height:1.7;max-width:280px}
+
+.loading-wrap{flex:1;display:flex;align-items:center;justify-content:center}
+.loading-spinner{width:32px;height:32px;border:2px solid rgba(201,168,76,.2);border-top-color:#C9A84C;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── CONNECTION STATUS ── */
+.conn-status{
+  position:fixed;top:16px;left:50%;transform:translateX(-50%);
+  padding:6px 16px;border-radius:20px;font-size:12px;font-weight:500;
+  z-index:100;transition:all .3s;pointer-events:none;
+}
+.conn-status.disconnected{background:#B5481A;color:#fff;opacity:1}
+.conn-status.reconnecting{background:#8B6914;color:#fff;opacity:1}
+.conn-status.connected{opacity:0}
+
+/* Toast */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:#2A1C06;color:#E8D5A3;padding:9px 18px;border-radius:3px;font-size:12.5px;z-index:999;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;white-space:nowrap;border:.5px solid rgba(201,168,76,.2)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Mobile */
+@media(max-width:700px){
+  .conv-list{display:none}
+  .bubble{max-width:calc(100vw - 90px)}
+  .input-area{padding:10px 12px 14px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ══ CONVERSATION LIST ══ -->
+  <div class="conv-list">
+    <div class="conv-header">
+      <h2>Messages</h2>
+      <p id="conv-count">Loading…</p>
+    </div>
+    <div class="conv-items" id="conv-items">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+
+  <!-- ══ CHAT PANEL ══ -->
+  <div class="chat-panel" id="chat-panel">
+
+    <!-- Header -->
+    <div class="chat-header" id="chat-header" style="display:none">
+      <div class="chat-header-av" id="hdr-av">SR</div>
+      <div class="chat-header-info">
+        <div class="chat-header-name" id="hdr-name">Sara R.</div>
+        <div class="chat-header-sub">
+          <span class="dot" id="hdr-dot"></span>
+          <span id="hdr-sub">30 · Physician · Toronto</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="icon-btn" onclick="showMatchInfo()" title="Match details">⚙</button>
+      </div>
+    </div>
+
+    <!-- Expiry bar -->
+    <div class="expiry-bar hidden" id="expiry-bar">
+      <span id="expiry-text">28 days remaining</span>
+      <div class="expiry-progress"><div class="expiry-fill" id="expiry-fill" style="width:93%"></div></div>
+      <span id="expiry-score" style="font-size:11px;opacity:.7;white-space:nowrap">91% match</span>
+    </div>
+
+    <!-- Loading state -->
+    <div class="loading-wrap" id="loading-wrap">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <!-- Message area (hidden until loaded) -->
+    <div class="msg-area" id="msg-area" style="display:none"></div>
+
+    <!-- Icebreakers panel -->
+    <div class="icebreakers-panel" id="ib-panel" style="display:none">
+      <div class="ib-label">✦ AI Conversation Starters <button class="ib-dismiss" onclick="dismissIcebreakers()">Dismiss</button></div>
+      <div class="ib-chips" id="ib-chips"></div>
+    </div>
+
+    <!-- Typing indicator -->
+    <div class="typing-wrap" id="typing-wrap" style="display:none">
+      <div class="typing-indicator" id="typing-indicator">
+        <div class="typing-dots">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+        <span id="typing-name">Sara</span> is typing…
+      </div>
+    </div>
+
+    <!-- Recording bar -->
+    <div class="recording-bar" id="recording-bar">
+      <div class="rec-dot"></div>
+      <span class="rec-time" id="rec-time">0:00</span>
+      <button class="rec-cancel" onclick="cancelRecording()">Cancel</button>
+      <button class="rec-send" onclick="sendVoiceNote()">Send ▶</button>
+    </div>
+
+    <!-- Input area -->
+    <div class="input-area" id="input-area" style="display:none">
+      <div class="input-row">
+        <div class="input-box">
+          <textarea
+            class="msg-input"
+            id="msg-input"
+            rows="1"
+            placeholder="Write a message…"
+            onkeydown="handleKeyDown(event)"
+            oninput="handleInputChange(this)"
+          ></textarea>
+          <span class="char-warn" id="char-warn">1800+</span>
+        </div>
+        <button class="icon-btn" id="voice-btn" onclick="startRecording()" title="Voice note">🎙</button>
+        <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled>↑</button>
+      </div>
+    </div>
+
+    <!-- Empty state (no conversation selected) -->
+    <div class="empty-chat" id="empty-chat">
+      <div class="empty-icon">💬</div>
+      <h2 class="empty-h">Your conversations</h2>
+      <p class="empty-p">Select a conversation from the left, or unlock a match to begin chatting.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- Connection status indicator -->
+<div class="conn-status connected" id="conn-status">Reconnecting…</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════
+   CONFIG
+   ══════════════════════════════════════════════════ */
+const API      = window.HASSABE_CONFIG.API;
+const MY_ID    = localStorage.getItem('hassabe_user_id') || 'user-me';
+const TOKEN    = localStorage.getItem('hassabe_token')   || 'demo-token';
+
+/* ══════════════════════════════════════════════════
+   MOCK DATA (replace with API calls in production)
+   ══════════════════════════════════════════════════ */
+const MOCK_CONVERSATIONS = [
+  {
+    matchId:      'match-003',
+    partnerName:  'Yonas T.',
+    partnerInitials: 'YT',
+    partnerSub:   '32 · Fintech · Washington D.C.',
+    score:        91,
+    unread:       2,
+    lastMessage:  'What does a meaningful Sunday morning look like?',
+    lastTime:     new Date(Date.now() - 25*60000).toISOString(),
+    expiresAt:    new Date(Date.now() + 28*24*3600000).toISOString(),
+    icebreakers: [
+      'What does a meaningful Sunday morning look like in your household?',
+      'Is there a tradition from home that you carry no matter where you live?',
+      'What has living in the diaspora taught you about yourself?',
+    ],
+  },
+];
+
+const MOCK_MESSAGES = [
+  { id:'m1', senderId:'partner', content:'What does a meaningful Sunday morning look like in your household?', type:'ai_starter', sentAt: new Date(Date.now()-2*24*3600000).toISOString(), readAt: new Date(Date.now()-2*24*3600000+60000).toISOString() },
+  { id:'m2', senderId:MY_ID,    content:'I love that question. Sundays start with the coffee ceremony at my parents\' house — the whole ritual with incense and three rounds. Then church, then a huge injera lunch. It\'s the most grounding part of my week.', type:'text', sentAt: new Date(Date.now()-2*24*3600000+120000).toISOString(), readAt: new Date(Date.now()-2*24*3600000+180000).toISOString() },
+  { id:'m3', senderId:'partner', content:'That sounds beautiful. We have something similar — my mum insists on making kitcha every Sunday. It\'s the smell that does it for me. Takes me straight back to Asmara.', type:'text', sentAt: new Date(Date.now()-23*3600000).toISOString(), readAt: new Date(Date.now()-23*3600000+30000).toISOString() },
+  { id:'m4', senderId:MY_ID,    content:'The smell is everything! What part of Eritrea is your family from originally?', type:'text', sentAt: new Date(Date.now()-22*3600000).toISOString(), readAt: new Date(Date.now()-22*3600000+15000).toISOString() },
+  { id:'m5', senderId:'partner', content:null, type:'voice', voiceUrl:'#', voiceDuration:14, sentAt: new Date(Date.now()-30*60000).toISOString(), readAt: null },
+  { id:'m6', senderId:'partner', content:'Also — is there one tradition you\'re determined to carry forward no matter where you end up living?', type:'text', sentAt: new Date(Date.now()-28*60000).toISOString(), readAt: null },
+];
+
+/* ══════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════ */
+let socket         = null;
+let currentMatch   = null;
+let messages       = [];
+let typingTimeout  = null;
+let mediaRecorder  = null;
+let audioChunks    = [];
+let recordingTimer = null;
+let recordingSeconds = 0;
+let isIbDismissed  = false;
+
+/* ══════════════════════════════════════════════════
+   INIT
+   ══════════════════════════════════════════════════ */
+(function init() {
+  renderConversationList();
+  connectSocket();
+  // Auto-open first conversation in demo
+  setTimeout(() => openConversation(MOCK_CONVERSATIONS[0]), 400);
+})();
+
+/* ══════════════════════════════════════════════════
+   SOCKET.IO CONNECTION
+   ══════════════════════════════════════════════════ */
+function connectSocket() {
+  socket = io(API, {
+       auth: { token: TOKEN },
+       transports: ['websocket', 'polling'],
+     });
+     bindSocketEvents();
+  // Demo: simulate socket with a mock object
+  socket = createMockSocket();
+}
+
+function bindSocketEvents() {
+  socket.on('connect', () => {
+    document.getElementById('conn-status').className = 'conn-status connected';
+    if (currentMatch) joinRoom(currentMatch.matchId);
+  });
+  socket.on('disconnect', () => {
+    document.getElementById('conn-status').className = 'conn-status disconnected';
+    document.getElementById('conn-status').textContent = 'Disconnected — reconnecting…';
+  });
+  socket.on('connect_error', () => {
+    document.getElementById('conn-status').className = 'conn-status reconnecting';
+    document.getElementById('conn-status').textContent = 'Reconnecting…';
+  });
+  socket.on('joined', (data) => {
+    messages = data.messages || [];
+    renderMessages();
+    renderExpiryBar(data.expiresAt, data.daysLeft);
+    if (data.messages.length === 0 && !isIbDismissed) showIcebreakers(currentMatch?.icebreakers || []);
+    hideLoading();
+  });
+  socket.on('new_message', (msg) => {
+    messages.push(msg);
+    renderMessages();
+    scrollToBottom();
+    if (msg.senderId !== MY_ID) markReadViaSocket(currentMatch?.matchId);
+    updateConvPreview(msg);
+  });
+  socket.on('typing', ({ userId }) => {
+    if (userId !== MY_ID) showTyping();
+  });
+  socket.on('stopped_typing', () => hideTyping());
+  socket.on('messages_read', ({ upToMessageId }) => {
+    messages.forEach(m => { if (m.senderId === MY_ID && !m.readAt) m.readAt = new Date().toISOString(); });
+    renderMessages(false);
+  });
+  socket.on('icebreakers_ready', ({ icebreakers }) => {
+    if (!isIbDismissed) showIcebreakers(icebreakers);
+  });
+  socket.on('match_expiring', ({ daysLeft }) => {
+    toast(`⚠️ This conversation closes in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`);
+  });
+  socket.on('match_expired', () => {
+    showExpiredState();
+  });
+  socket.on('error', ({ code, message }) => {
+    console.warn('[Socket] Error:', code, message);
+  });
+}
+
+/* ══════════════════════════════════════════════════
+   CONVERSATION LIST
+   ══════════════════════════════════════════════════ */
+function renderConversationList() {
+  const items = document.getElementById('conv-items');
+  const count = document.getElementById('conv-count');
+  count.textContent = `${MOCK_CONVERSATIONS.length} active conversation${MOCK_CONVERSATIONS.length !== 1 ? 's' : ''}`;
+
+  items.innerHTML = MOCK_CONVERSATIONS.map(c => `
+    <div class="conv-item" id="citem-${c.matchId}" onclick="openConversation(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+      <div class="conv-av">
+        ${c.partnerInitials}
+        <div class="online-dot"></div>
+      </div>
+      <div class="conv-body">
+        <div class="conv-name">${c.partnerName}</div>
+        <div class="conv-preview">${c.lastMessage || 'Start the conversation…'}</div>
+      </div>
+      <div class="conv-meta">
+        <div class="conv-time">${formatTime(c.lastTime)}</div>
+        ${c.unread ? `<div class="conv-badge">${c.unread}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function openConversation(conv) {
+  if (currentMatch?.matchId === conv.matchId) return;
+  currentMatch = conv;
+
+  // Highlight in sidebar
+  document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`citem-${conv.matchId}`)?.classList.add('active');
+
+  // Remove unread badge
+  const badge = document.querySelector(`#citem-${conv.matchId} .conv-badge`);
+  if (badge) badge.remove();
+
+  // Set header
+  document.getElementById('hdr-av').textContent  = conv.partnerInitials;
+  document.getElementById('hdr-name').textContent = conv.partnerName;
+  document.getElementById('hdr-sub').textContent  = conv.partnerSub;
+  document.getElementById('hdr-dot').className    = 'dot online';
+
+  // Show chat elements
+  document.getElementById('chat-header').style.display = 'flex';
+  document.getElementById('input-area').style.display   = '';
+  document.getElementById('empty-chat').style.display   = 'none';
+  document.getElementById('msg-area').style.display     = 'flex';
+  showLoading();
+  hideTyping();
+
+  // Join via socket
+  joinRoom(conv.matchId);
+
+  // Demo: load mock messages after delay
+  setTimeout(() => {
+    messages = [...MOCK_MESSAGES];
+    renderMessages();
+    renderExpiryBar(conv.expiresAt, 28);
+    if (messages.length > 0) hideIcebreakers();
+    else if (!isIbDismissed) showIcebreakers(conv.icebreakers || []);
+    hideLoading();
+    scrollToBottom(false);
+    markReadViaSocket(conv.matchId);
+  }, 600);
+}
+
+/* ══════════════════════════════════════════════════
+   SOCKET ACTIONS
+   ══════════════════════════════════════════════════ */
+function joinRoom(matchId) {
+  socket.emit('join_conversation', { matchId });
+}
+
+function markReadViaSocket(matchId) {
+  if (!matchId) return;
+  socket.emit('mark_read', { matchId });
+}
+
+/* ══════════════════════════════════════════════════
+   RENDER MESSAGES
+   ══════════════════════════════════════════════════ */
+function renderMessages(scroll = true) {
+  const area = document.getElementById('msg-area');
+  if (!area) return;
+
+  const grouped = groupMessages(messages);
+  let html      = '';
+  let lastDate  = null;
+
+  for (const group of grouped) {
+    const dateLabel = getDateLabel(group.messages[0].sentAt);
+    if (dateLabel !== lastDate) {
+      html += `<div class="date-divider"><span>${dateLabel}</span></div>`;
+      lastDate = dateLabel;
+    }
+
+    const isMine   = group.senderId === MY_ID;
+    const initials = isMine ? 'ST' : (currentMatch?.partnerInitials || 'P');
+
+    html += `<div class="msg-group ${isMine ? 'mine' : 'theirs'}">`;
+
+    group.messages.forEach((msg, i) => {
+      const isLast = i === group.messages.length - 1;
+      html += `<div class="msg-row">`;
+
+      if (!isMine) {
+        html += `<div class="msg-av ${isLast ? '' : 'spacer'}">${initials}</div>`;
+      }
+
+      html += renderBubble(msg, isMine, isLast);
+      html += `</div>`;
+
+      // Timestamp on last in group
+      if (isLast) {
+        const timeStr  = new Date(msg.sentAt).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+        const readText = isMine && msg.readAt ? `<span class="check">✓✓</span>` : (isMine ? '✓' : '');
+        html += `<div class="read-receipt">${readText} ${timeStr}</div>`;
+      }
+    });
+
+    html += `</div>`;
+  }
+
+  area.innerHTML = html;
+  if (scroll) scrollToBottom();
+}
+
+function renderBubble(msg, isMine, isLast) {
+  if (msg.type === 'voice') {
+    const bars = Array.from({length:16}, (_, i) => {
+      const h = 20 + Math.sin(i * 0.7) * 14 + Math.random() * 8;
+      return `<div class="voice-bar" style="height:${Math.round(h)}px"></div>`;
+    }).join('');
+
+    return `
+      <div class="bubble voice ${msg.sending ? 'sending' : ''}" onclick="playVoice('${msg.id}','${msg.voiceUrl}')">
+        <div class="voice-play" id="vplay-${msg.id}">▶</div>
+        <div class="voice-wave" id="vwave-${msg.id}">${bars}</div>
+        <div class="voice-duration">${formatDuration(msg.voiceDuration)}</div>
+      </div>`;
+  }
+
+  const cls = msg.type === 'ai_starter' ? ' ai-starter' : '';
+  return `<div class="bubble${cls} ${msg.sending ? 'sending' : ''}">${escapeHtml(msg.content)}</div>`;
+}
+
+function groupMessages(msgs) {
+  const groups = [];
+  for (const msg of msgs) {
+    const last = groups[groups.length - 1];
+    const timeDiff = last && Math.abs(new Date(msg.sentAt) - new Date(last.messages[last.messages.length-1].sentAt)) < 3 * 60 * 1000;
+    if (last && last.senderId === msg.senderId && timeDiff) {
+      last.messages.push(msg);
+    } else {
+      groups.push({ senderId: msg.senderId, messages: [msg] });
+    }
+  }
+  return groups;
+}
+
+/* ══════════════════════════════════════════════════
+   SEND MESSAGE
+   ══════════════════════════════════════════════════ */
+function sendMessage(content, type = 'text') {
+  const input = document.getElementById('msg-input');
+  const text  = (content || input?.value || '').trim();
+  if (!text || !currentMatch) return;
+
+  const clientMsgId = `client-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  // Optimistic add
+  const optimistic = {
+    id:          clientMsgId,
+    senderId:    MY_ID,
+    content:     text,
+    type,
+    sentAt:      new Date().toISOString(),
+    readAt:      null,
+    sending:     true,
+    clientMsgId,
+  };
+  messages.push(optimistic);
+  renderMessages();
+  scrollToBottom();
+
+  // Clear input
+  if (!content && input) {
+    input.value = '';
+    adjustTextarea(input);
+    document.getElementById('send-btn').disabled = true;
+  }
+
+  // Emit
+  socket.emit('send_message', {
+    matchId:     currentMatch.matchId,
+    content:     text,
+    type,
+    clientMsgId,
+  });
+
+  // Mark as sent after brief delay (demo)
+  setTimeout(() => {
+    const idx = messages.findIndex(m => m.clientMsgId === clientMsgId);
+    if (idx >= 0) { messages[idx].sending = false; renderMessages(false); }
+  }, 600);
+}
+
+/* ══════════════════════════════════════════════════
+   INPUT HANDLING
+   ══════════════════════════════════════════════════ */
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function handleInputChange(el) {
+  adjustTextarea(el);
+  const len = el.value.length;
+  const btn = document.getElementById('send-btn');
+  btn.disabled = len === 0;
+
+  // Char warning
+  const warn = document.getElementById('char-warn');
+  if (len > 1800) { warn.textContent = `${2000 - len} left`; warn.classList.add('show'); }
+  else warn.classList.remove('show');
+
+  // Typing indicator
+  if (currentMatch && len > 0) {
+    socket.emit('typing_start', { matchId: currentMatch.matchId });
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      socket.emit('typing_stop', { matchId: currentMatch.matchId });
+    }, 2500);
+  } else if (currentMatch && len === 0) {
+    socket.emit('typing_stop', { matchId: currentMatch.matchId });
+  }
+}
+
+function adjustTextarea(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+/* ══════════════════════════════════════════════════
+   ICEBREAKERS
+   ══════════════════════════════════════════════════ */
+function showIcebreakers(icebreakers) {
+  if (!icebreakers?.length || isIbDismissed) return;
+  const panel = document.getElementById('ib-panel');
+  const chips = document.getElementById('ib-chips');
+  chips.innerHTML = icebreakers.map(ib => `
+    <div class="ib-chip" onclick="useIcebreaker(${JSON.stringify(ib).replace(/"/g,'&quot;')})">${ib}</div>
+  `).join('');
+  panel.style.display = '';
+}
+
+function hideIcebreakers() {
+  document.getElementById('ib-panel').style.display = 'none';
+}
+
+function dismissIcebreakers() {
+  isIbDismissed = true;
+  hideIcebreakers();
+}
+
+function useIcebreaker(text) {
+  sendMessage(text, 'ai_starter');
+  dismissIcebreakers();
+}
+
+/* ══════════════════════════════════════════════════
+   VOICE NOTES
+   ══════════════════════════════════════════════════ */
+async function startRecording() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return toast('Voice notes require microphone access');
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks  = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.start(100);
+
+    recordingSeconds = 0;
+    document.getElementById('recording-bar').classList.add('active');
+    document.getElementById('input-area').querySelector('.input-row').style.display = 'none';
+
+    recordingTimer = setInterval(() => {
+      recordingSeconds++;
+      const m = Math.floor(recordingSeconds / 60);
+      const s = String(recordingSeconds % 60).padStart(2,'0');
+      document.getElementById('rec-time').textContent = `${m}:${s}`;
+      if (recordingSeconds >= 120) sendVoiceNote();
+    }, 1000);
+
+  } catch (err) {
+    toast('Could not access microphone. Check browser permissions.');
+  }
+}
+
+function cancelRecording() {
+  stopRecordingUI();
+  mediaRecorder?.stream?.getTracks().forEach(t => t.stop());
+  mediaRecorder = null;
+  audioChunks   = [];
+}
+
+function stopRecordingUI() {
+  clearInterval(recordingTimer);
+  document.getElementById('recording-bar').classList.remove('active');
+  document.getElementById('input-area').querySelector('.input-row').style.display = '';
+}
+
+async function sendVoiceNote() {
+  if (!mediaRecorder) return;
+  mediaRecorder.stop();
+  mediaRecorder.stream.getTracks().forEach(t => t.stop());
+
+  const duration  = recordingSeconds;
+  stopRecordingUI();
+
+  mediaRecorder.onstop = async () => {
+    if (!audioChunks.length) return;
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    audioChunks = [];
+    mediaRecorder = null;
+
+    // Demo: simulate voice note message
+    const voiceMsg = {
+      id:            `voice-${Date.now()}`,
+      senderId:      MY_ID,
+      content:       `[Voice note — ${duration}s]`,
+      type:          'voice',
+      voiceUrl:      '#',
+      voiceDuration: duration,
+      sentAt:        new Date().toISOString(),
+      readAt:        null,
+      sending:       true,
+    };
+    messages.push(voiceMsg);
+    renderMessages();
+    scrollToBottom();
+    toast(`Voice note (${formatDuration(duration)}) sent`);
+
+    — upload via REST:
+       const formData = new FormData();
+       formData.append('audio', blob, 'voice.webm');
+       formData.append('duration_s', duration);
+       const res = await fetch(`${API}/api/chat/${currentMatch.matchId}/voice`, {
+         method: 'POST',
+         headers: { 'Authorization': `Bearer ${TOKEN}` },
+         body: formData
+       });
+       const { message } = await res.json();
+       const idx = messages.findIndex(m => m.id === voiceMsg.id);
+       if (idx >= 0) messages[idx] = { ...message, sending: false };
+       renderMessages(false);
+    setTimeout(() => {
+      const idx = messages.findIndex(m => m.id === voiceMsg.id);
+      if (idx >= 0) { messages[idx].sending = false; renderMessages(false); }
+    }, 1000);
+  };
+}
+
+function playVoice(msgId, url) {
+  if (url === '#') return toast('Voice playback — wire to real URL in production');
+  const audio = new Audio(url);
+  const bars  = document.querySelectorAll(`#vwave-${msgId} .voice-bar`);
+  bars.forEach(b => b.classList.add('playing'));
+  audio.play();
+  audio.onended = () => bars.forEach(b => b.classList.remove('playing'));
+}
+
+/* ══════════════════════════════════════════════════
+   EXPIRY BAR
+   ══════════════════════════════════════════════════ */
+function renderExpiryBar(expiresAt, daysLeft) {
+  const bar = document.getElementById('expiry-bar');
+  if (!expiresAt) { bar.classList.add('hidden'); return; }
+
+  const totalDays = 30;
+  const pct       = Math.max(0, (daysLeft / totalDays) * 100);
+  const urgent    = daysLeft <= 3;
+
+  document.getElementById('expiry-text').textContent  = `${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining`;
+  document.getElementById('expiry-fill').style.width  = pct + '%';
+  if (currentMatch?.score) document.getElementById('expiry-score').textContent = `${currentMatch.score}% match`;
+
+  bar.classList.toggle('hidden', false);
+  bar.classList.toggle('urgent', urgent);
+}
+
+function showExpiredState() {
+  document.getElementById('input-area').style.display   = 'none';
+  document.getElementById('ib-panel').style.display      = 'none';
+  document.getElementById('typing-wrap').style.display   = 'none';
+  const bar = document.getElementById('expiry-bar');
+  bar.classList.remove('hidden');
+  bar.classList.add('urgent');
+  document.getElementById('expiry-text').textContent = 'This conversation has closed';
+  document.getElementById('expiry-fill').style.width  = '0%';
+}
+
+/* ══════════════════════════════════════════════════
+   TYPING INDICATOR
+   ══════════════════════════════════════════════════ */
+function showTyping() {
+  const wrap = document.getElementById('typing-wrap');
+  document.getElementById('typing-name').textContent = currentMatch?.partnerName?.split(' ')[0] || 'Partner';
+  wrap.style.display = '';
+  scrollToBottom();
+}
+function hideTyping() {
+  document.getElementById('typing-wrap').style.display = 'none';
+}
+
+/* ══════════════════════════════════════════════════
+   LOADING / EMPTY
+   ══════════════════════════════════════════════════ */
+function showLoading() {
+  document.getElementById('loading-wrap').style.display = '';
+  document.getElementById('msg-area').style.display     = 'none';
+}
+function hideLoading() {
+  document.getElementById('loading-wrap').style.display = 'none';
+  document.getElementById('msg-area').style.display     = 'flex';
+}
+
+/* ══════════════════════════════════════════════════
+   SCROLL / HELPERS
+   ══════════════════════════════════════════════════ */
+function scrollToBottom(smooth = true) {
+  const area = document.getElementById('msg-area');
+  if (!area) return;
+  if (smooth) area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' });
+  else area.scrollTop = area.scrollHeight;
+}
+
+function updateConvPreview(msg) {
+  const item = document.getElementById(`citem-${msg.matchId}`);
+  if (!item) return;
+  const preview = item.querySelector('.conv-preview');
+  if (preview) preview.textContent = msg.content || `[Voice note]`;
+  const time = item.querySelector('.conv-time');
+  if (time) time.textContent = formatTime(msg.sentAt);
+}
+
+function showMatchInfo() { toast('Match details — see match dashboard for full info'); }
+
+function getDateLabel(iso) {
+  const d    = new Date(iso);
+  const now  = new Date();
+  const diff = Math.floor((now - d) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+}
+
+function formatTime(iso) {
+  const d    = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  const hrs  = Math.floor(diff / 3600000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return `${mins}m`;
+  if (hrs  < 24) return `${hrs}h`;
+  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+}
+
+function formatDuration(s) {
+  if (!s) return '0:00';
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
+}
+
+/* ══════════════════════════════════════════════════
+   MOCK SOCKET (demo mode — remove in production)
+   ══════════════════════════════════════════════════ */
+function createMockSocket() {
+  const handlers = {};
+  const mock = {
+    on:   (ev, fn) => { handlers[ev] = fn; return mock; },
+    emit: (ev, data) => {
+      // Simulate partner typing response
+      if (ev === 'join_conversation') {
+        setTimeout(() => handlers['joined']?.({ messages: [], expiresAt: new Date(Date.now()+28*86400000).toISOString(), daysLeft: 28 }), 500);
+      }
+    },
+    disconnect: () => {},
+  };
+  return mock;
+}
+
+let toastT;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "name": "hassabe-backend",
+  "version": "1.0.0",
+  "description": "Hassabe - AI Matchmaking Platform for Ethiopian & Eritrean Diaspora",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "engine": "node matching-engine.js",
+    "engine:dry": "node matching-engine.js --dry-run"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^1.41.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "firebase-admin": "^12.0.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.7",
+    "openai": "^4.28.0",
+    "pg": "^8.11.3",
+    "qrcode": "^1.5.3",
+    "resend": "^3.1.0",
+    "socket.io": "^4.7.5",
+    "speakeasy": "^2.0.0",
+    "stripe": "^14.21.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
