@@ -347,11 +347,11 @@ async function sendEmail(toEmail, firstName, subject, type, data, fallbackTitle,
 
   try {
     await resend.emails.send({
-      from:    'Hassabe <noreply@admin.hassabe.com>',
+      from:    'Hassabe ሃሳቤ <admin@hassabe.com>',
       to:      toEmail,
       subject,
       html,
-      text:    `${fallbackTitle}\n\n${fallbackBody}\n\nOpen Hassabe: https://hassabe.app`,
+      text:    `${fallbackTitle}\n\n${fallbackBody}\n\nOpen Hassabe: https://hassabe.com`,
       headers: {
         'X-Entity-Ref-ID': `hassabe-${type}-${Date.now()}`,
       },
@@ -369,19 +369,19 @@ async function sendEmail(toEmail, firstName, subject, type, data, fallbackTitle,
 
 function buildEmailHTML(type, firstName, data, title, body) {
   const ctaConfig = {
-    new_match:          { text: 'View My Match →',      url: 'https://hassabe.app/matches' },
-    r2_reminder:        { text: 'Complete Round 2 →',   url: 'https://hassabe.app/matches' },
-    r2_partner_done:    { text: 'Complete Round 2 →',   url: 'https://hassabe.app/matches' },
-    match_approved:     { text: 'Unlock Conversation →',url: 'https://hassabe.app/matches' },
-    match_declined:     { text: 'Back to Dashboard →',  url: 'https://hassabe.app/dashboard' },
-    match_expiring:     { text: 'Open Conversation →',  url: 'https://hassabe.app/messages' },
-    messaging_unlocked: { text: 'Start the Conversation →', url: 'https://hassabe.app/messages' },
-    message_received:   { text: 'Reply Now →',          url: 'https://hassabe.app/messages' },
-    profile_incomplete: { text: 'Complete My Profile →',url: 'https://hassabe.app/profile' },
-    community_event:    { text: 'RSVP Now →',           url: data.eventUrl || 'https://hassabe.app' },
+    new_match:          { text: 'View My Match →',      url: 'https://hassabe.com/matches' },
+    r2_reminder:        { text: 'Complete Round 2 →',   url: 'https://hassabe.com/matches' },
+    r2_partner_done:    { text: 'Complete Round 2 →',   url: 'https://hassabe.com/matches' },
+    match_approved:     { text: 'Unlock Conversation →',url: 'https://hassabe.com/matches' },
+    match_declined:     { text: 'Back to Dashboard →',  url: 'https://hassabe.com/dashboard' },
+    match_expiring:     { text: 'Open Conversation →',  url: 'https://hassabe.com/messages' },
+    messaging_unlocked: { text: 'Start the Conversation →', url: 'https://hassabe.com/messages' },
+    message_received:   { text: 'Reply Now →',          url: 'https://hassabe.com/messages' },
+    profile_incomplete: { text: 'Complete My Profile →',url: 'https://hassabe.com/profile' },
+    community_event:    { text: 'RSVP Now →',           url: data.eventUrl || 'https://hassabe.com' },
   };
 
-  const cta = ctaConfig[type] || { text: 'Open Hassabe →', url: 'https://hassabe.app' };
+  const cta = ctaConfig[type] || { text: 'Open Hassabe →', url: 'https://hassabe.com' };
 
   // Score badge (only for match-related types)
   const scoreBadge = data.score || data.combinedScore ? `
@@ -434,7 +434,7 @@ function buildEmailHTML(type, firstName, data, title, body) {
     </table>
 
     <p style="font-size:12px;color:#9A8A72;line-height:1.7;margin:24px 0 0 0;border-top:0.5px solid rgba(139,105,20,0.12);padding-top:20px">
-      If you did not expect this notification, you can manage your preferences in <a href="https://hassabe.app/settings" style="color:#8B6914;text-decoration:none">Settings</a>.<br>
+      If you did not expect this notification, you can manage your preferences in <a href="https://hassabe.com/settings" style="color:#8B6914;text-decoration:none">Settings</a>.<br>
       This message was sent to you because you have an active Hassabe account.
     </p>
   </td></tr>
@@ -443,8 +443,8 @@ function buildEmailHTML(type, firstName, data, title, body) {
   <tr><td style="background:#F7F1E8;padding:16px 32px;text-align:center;border-top:0.5px solid rgba(139,105,20,0.1)">
     <p style="font-size:11px;color:#B5A88C;margin:0;letter-spacing:0.04em">
       © 2025 Hassabe Inc. &nbsp;·&nbsp;
-      <a href="https://hassabe.app/unsubscribe" style="color:#B5A88C;text-decoration:none">Unsubscribe</a> &nbsp;·&nbsp;
-      <a href="https://hassabe.app/privacy" style="color:#B5A88C;text-decoration:none">Privacy Policy</a>
+      <a href="https://hassabe.coom/unsubscribe" style="color:#B5A88C;text-decoration:none">Unsubscribe</a> &nbsp;·&nbsp;
+      <a href="https://hassabe.com/privacy" style="color:#B5A88C;text-decoration:none">Privacy Policy</a>
     </p>
   </td></tr>
 

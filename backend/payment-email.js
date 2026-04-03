@@ -13,8 +13,8 @@ require('dotenv').config();
 const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM   = 'Hassabe <noreply@admin.hassabe.com>';
-const BASE   = process.env.FRONTEND_URL || 'https://hassabe.app';
+const FROM   = 'Hassabe ሃሳቤ <admin@hassabe.com>';
+const BASE   = process.env.FRONTEND_URL || 'https://hassabe.com';
 
 // ── Shared brand shell ────────────────────────────────────────
 function shell(title, bodyHtml) {
@@ -137,7 +137,7 @@ async function sendReceiptEmail({ email, firstName, partnerName, amount, currenc
     ${divider()}
     <p style="font-size:12px;color:#9A8A72;line-height:1.7;margin:0">
       Questions about your payment?
-      <a href="mailto:support@hassabe.app" style="color:#8B6914;text-decoration:none">Contact support</a>.
+      <a href="mailto:support@hassabe.com" style="color:#8B6914;text-decoration:none">Contact support</a>.
       If you did not make this purchase, please contact us immediately.
     </p>`;
 
@@ -181,7 +181,7 @@ async function sendRefundEmail({ email, firstName, amount, currency, refundId, r
     ${divider()}
     <p style="font-size:12px;color:#9A8A72;line-height:1.7;margin:0">
       If you have questions about this refund,
-      <a href="mailto:support@hassabe.app" style="color:#8B6914;text-decoration:none">contact our support team</a>.
+      <a href="mailto:support@hassabe.com" style="color:#8B6914;text-decoration:none">contact our support team</a>.
     </p>`;
 
   await resend.emails.send({

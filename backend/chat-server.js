@@ -70,7 +70,7 @@ function initChatServer(httpServer) {
 
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET, {
-        issuer: 'hassabe.app', audience: 'hassabe-api',
+        issuer: 'hassabe.com', audience: 'hassabe-api',
       });
 
       const result = await pool.query(
@@ -360,7 +360,7 @@ function initChatServer(httpServer) {
            });
            const audioUrl = uploadResult.secure_url;
         */
-        const audioUrl = `https://placeholder-voice.hassabe.app/${Date.now()}.mp3`;
+        const audioUrl = `https://placeholder-voice.hassabe.com/${Date.now()}.mp3`;
 
         // Save message record
         const msg = await pool.query(`

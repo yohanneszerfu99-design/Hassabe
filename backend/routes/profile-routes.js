@@ -25,23 +25,6 @@ const jwt        = require('jsonwebtoken');
 const router     = express.Router();
 const pool       = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// ── Cloudinary config ──
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true,
-});
-
-// ── Multer (in-memory for Cloudinary upload) ──
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Only image files are allowed'));
-    }
-    cb(null, true);
-  },
-});
-
 // ── Rate limiter for profile updates ──
 const profileLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -286,94 +269,6 @@ router.put('/me', requireAuth, profileLimiter, async (req, res) => {
 
 // ═══════════════════════════════════════════════════════════════
 //  DELETE /api/profile/photos/:photoId
-// ═══════════════════════════════════════════════════════════════
-router.delete('/photos/:photoId',
-  requireAuth,
-  [param('photoId').isUUID()],
-  async (req, res) => {
-    const err = checkValidation(req, res);
-    if (err) return;
-
-    try {
-      // Verify ownership
-      const result = await pool.query(`
-        JOIN profiles p ON p.id = ph.profile_id
-        WHERE ph.id = $1 AND p.user_id = $2
-      `, [req.params.photoId, req.user.id]);
-
-      if (!result.rows[0]) return res.status(404).json({ error: 'Photo not found' });
-
-
-      // Delete from Cloudinary
-
-      // Delete from DB
-
-      // Re-number positions
-      await pool.query(
-         WHERE profile_id = $1 AND position > $2`,
-        [profile_id, position]
-      );
-
-      // Update main photo flag if needed
-      await pool.query(
-         WHERE profile_id = $1 AND position = 0 AND is_main = false`,
-        [profile_id]
-      );
-
-      // Recalculate score
-      const profResult = await pool.query('SELECT * FROM profiles WHERE id = $1', [profile_id]);
-      const score = calculateProfileScore({ ...profResult.rows[0], photos: photos.rows });
-      await pool.query('UPDATE profiles SET profile_score = $1 WHERE id = $2', [score, profile_id]);
-
-      res.json({ message: 'Photo deleted.', profileScore: score });
-    } catch (err) {
-      console.error('Delete photo error:', err);
-      res.status(500).json({ error: 'Failed to delete photo' });
-    }
-  }
-);
-
-// ═══════════════════════════════════════════════════════════════
-//  PUT /api/profile/photos/reorder — Drag-to-reorder photos
-// ═══════════════════════════════════════════════════════════════
-router.put('/photos/reorder', requireAuth, async (req, res) => {
-  const { order } = req.body; // Array of photo IDs in new order
-  if (!Array.isArray(order)) return res.status(400).json({ error: 'order must be an array of photo IDs' });
-
-  try {
-    const profileResult = await pool.query('SELECT id FROM profiles WHERE user_id = $1', [req.user.id]);
-    if (!profileResult.rows[0]) return res.status(404).json({ error: 'Profile not found' });
-    const profileId = profileResult.rows[0].id;
-
-    // Verify all photos belong to this profile
-    const ownedResult = await pool.query(
-      [profileId]
-    );
-    const ownedIds = new Set(ownedResult.rows.map(r => r.id));
-    if (!order.every(id => ownedIds.has(id))) {
-      return res.status(403).json({ error: 'Invalid photo IDs' });
-    }
-
-    // Update positions in a transaction
-    await pool.query('BEGIN');
-    for (let i = 0; i < order.length; i++) {
-      await pool.query(
-        [i, i === 0, order[i]]
-      );
-    }
-    await pool.query('COMMIT');
-
-    res.json({ message: 'Photos reordered.' });
-  } catch (err) {
-    await pool.query('ROLLBACK').catch(() => {});
-    console.error('Reorder error:', err);
-    res.status(500).json({ error: 'Reorder failed' });
-  }
-});
-
-// ═══════════════════════════════════════════════════════════════
-//  GET /api/profile/:userId — View another user's PUBLIC profile
-//  Only available to confirmed matches — limited fields returned
 // ═══════════════════════════════════════════════════════════════
 router.get('/:userId',
   requireAuth,
