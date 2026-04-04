@@ -498,7 +498,7 @@ async function joinList(src){
   };
 
   /* ── Send to Formspree if configured ── */
-  if(FORMSPREE_ID&&FORMSPREE_ID!=='xpqyeyow'){
+  if(FORMSPREE_ID){
     try{
       await fetch(`https://formspree.io/f/xpqyeyow`,{
         method:'POST',
