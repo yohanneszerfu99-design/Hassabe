@@ -58,7 +58,7 @@ async function requireAuth(req, res, next) {
   if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authorization required' });
   try {
     const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET, {
-      issuer: 'hassabe.app', audience: 'hassabe-api',
+      issuer: 'hassabe.com', audience: 'hassabe-api',
     });
     const result = await pool.query(
       'SELECT id, name, email, status FROM users WHERE id = $1', [payload.sub]
@@ -166,7 +166,7 @@ router.post('/checkout/:matchId',
             product_data: {
               name:        'Hassabe — Conversation Unlock',
               description: `Unlock your private conversation with ${match.partner_first_name}. Includes 30-day messaging window and AI-generated icebreakers.`,
-              images:      ['https://hassabe.app/assets/unlock-preview.png'],
+              images:      ['https://hassabe.com/assets/unlock-preview.png'],
               metadata:    { matchId, userId: req.user.id },
             },
           },

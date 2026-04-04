@@ -17,8 +17,8 @@ const router  = express.Router();
 const pool    = new Pool({ connectionString: process.env.DATABASE_URL });
 const resend  = new Resend(process.env.RESEND_API_KEY);
 const SECRET  = process.env.JWT_SECRET;
-const FROM    = 'Hassabe <noreply@admin.hassabe.com>';
-const JWT_OPT = { issuer: 'hassabe.app', audience: 'hassabe-api' };
+const FROM    = 'Hassabe <admin@hassabe.com>';
+const JWT_OPT = { issuer: 'hassabe.com', audience: 'hassabe-api' };
 
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many attempts. Try again soon.' } });
 const otpLimiter  = rateLimit({ windowMs: 60 * 1000, max: 10 });

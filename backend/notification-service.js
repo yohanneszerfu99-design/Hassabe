@@ -347,7 +347,7 @@ async function sendEmail(toEmail, firstName, subject, type, data, fallbackTitle,
 
   try {
     await resend.emails.send({
-      from:    'Hassabe ሃሳቤ <admin@hassabe.com>',
+      from:    'Hassabe <admin@hassabe.com>',
       to:      toEmail,
       subject,
       html,
@@ -443,7 +443,7 @@ function buildEmailHTML(type, firstName, data, title, body) {
   <tr><td style="background:#F7F1E8;padding:16px 32px;text-align:center;border-top:0.5px solid rgba(139,105,20,0.1)">
     <p style="font-size:11px;color:#B5A88C;margin:0;letter-spacing:0.04em">
       © 2025 Hassabe Inc. &nbsp;·&nbsp;
-      <a href="https://hassabe.coom/unsubscribe" style="color:#B5A88C;text-decoration:none">Unsubscribe</a> &nbsp;·&nbsp;
+      <a href="https://hassabe.com/unsubscribe" style="color:#B5A88C;text-decoration:none">Unsubscribe</a> &nbsp;·&nbsp;
       <a href="https://hassabe.com/privacy" style="color:#B5A88C;text-decoration:none">Privacy Policy</a>
     </p>
   </td></tr>

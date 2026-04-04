@@ -59,7 +59,7 @@ async function requireAdmin(req, res, next) {
   if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authorization required' });
   try {
     const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET, {
-      issuer: 'hassabe.app', audience: 'hassabe-api',
+      issuer: 'hassabe.com', audience: 'hassabe-api',
     });
     const result = await pool.query(
       'SELECT id, name, email, status, is_admin FROM users WHERE id = $1', [payload.sub]

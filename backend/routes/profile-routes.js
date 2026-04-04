@@ -41,7 +41,7 @@ async function requireAuth(req, res, next) {
   try {
     const token = header.slice(7);
     const payload = jwt.verify(token, process.env.JWT_SECRET, {
-      issuer: 'hassabe.app', audience: 'hassabe-api',
+      issuer: 'hassabe.com', audience: 'hassabe-api',
     });
     const result = await pool.query(
       'SELECT id, name, email, status FROM users WHERE id = $1',

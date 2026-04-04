@@ -1,6 +1,6 @@
 // firebase-messaging-sw.js
 // Place this file in the ROOT of your Netlify frontend deployment.
-// Netlify: put it in your frontend/ folder so it's served at hassabe.app/firebase-messaging-sw.js
+// Netlify: put it in your frontend/ folder so it's served at hassabe.com/firebase-messaging-sw.js
 
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
