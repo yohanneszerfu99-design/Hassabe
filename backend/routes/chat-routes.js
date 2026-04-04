@@ -32,17 +32,6 @@ cloudinary.config({
   secure: true,
 });
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits:  { fileSize: 15 * 1024 * 1024 }, // 15MB
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith('audio/')) {
-      return cb(new Error('Only audio files are allowed'));
-    }
-    cb(null, true);
-  },
-});
-
 // ── Auth middleware ──
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
