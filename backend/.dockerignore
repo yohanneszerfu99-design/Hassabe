@@ -1,3 +1,15 @@
 node_modules
 .env
 *.log
+npm-debug.log*
+.git
+.gitignore
+frontend
+../frontend
+*.html
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+README*
