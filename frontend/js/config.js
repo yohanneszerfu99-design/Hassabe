@@ -10,7 +10,7 @@
  * ─────────────────────────────────────────────────────────────
  */
 window.HASSABE_CONFIG = {
-  API:       'https://your-hassabe-backend.railway.app', // ← CHANGE THIS
+  API:       'https://hassabe-production.up.railway.app, // ← CHANGE THIS
   STRIPE_PK: 'pk_live_your_stripe_publishable_key',      // ← CHANGE THIS
   DOMAIN:    'hassabe.com',
   CITIES: [
