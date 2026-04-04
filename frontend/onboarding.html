@@ -154,7 +154,7 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
       <div class="fg"><label class="fl">Last Name</label><input class="fi" id="last-name" type="text" placeholder="Tesfaye"><div class="ferr" id="err-last-name">Required</div></div>
     </div>
     <div class="fg-row">
-      <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="dob" type="date"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
+      <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="dob" type="date" id="dob-input"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
       <div class="fg"><label class="fl">Gender</label><select class="fi-select" id="gender"><option value="">Select…</option><option value="female">Female</option><option value="male">Male</option><option value="other">Prefer not to say</option></select><div class="ferr" id="err-gender">Required</div></div>
     </div>
     <div class="fg">
@@ -567,9 +567,35 @@ async function submitProfile(){
   if(score<50){toast('Please complete more of your profile (need 50+ score)');return;}
   const btn=document.getElementById('submit-btn');btn.classList.add('loading');btn.disabled=true;
   try {
+    const payload = {
+      first_name:             profile.first_name,
+      last_name:              profile.last_name,
+      date_of_birth:          profile.dob,
+      gender:                 profile.gender,
+      seeking:                profile.seeking,
+      city:                   profile.city,
+      profession:             profile.profession,
+      industry:               profile.industry,
+      education_level:        profile.education,
+      field_of_study:         profile.field_of_study,
+      ethnicity:              profile.ethnicity,
+      languages:              profile.languages,
+      heritage_strength:      profile.heritage_strength,
+      religion:               profile.religion,
+      practice_level:         profile.practice_level,
+      faith_match_importance: profile.faith_match_importance,
+      relationship_goal:      profile.relationship_goal,
+      marital_history:        profile.marital_history,
+      children_preference:    profile.children_preference,
+      open_to_relocation:     profile.open_to_relocation || 'open',
+      weekend_activities:     profile.weekend_activities,
+      deal_breakers:          profile.deal_breakers,
+      bio:                    profile.bio,
+      profile_score:          score,
+    };
     const res = await window.api('/api/profile', {
       method: 'POST',
-      body: JSON.stringify({...profile, date_of_birth: profile.dob, profile_score: score})
+      body: JSON.stringify(payload)
     });
     if (!res.ok) {
       const d = await res.json();
