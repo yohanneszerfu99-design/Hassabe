@@ -154,7 +154,7 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
       <div class="fg"><label class="fl">Last Name</label><input class="fi" id="last-name" type="text" placeholder="Tesfaye"><div class="ferr" id="err-last-name">Required</div></div>
     </div>
     <div class="fg-row">
-      <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="dob" type="date" max="2006-01-01"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
+      <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="dob" type="date" id="dob-input"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
       <div class="fg"><label class="fl">Gender</label><select class="fi-select" id="gender"><option value="">Select…</option><option value="female">Female</option><option value="male">Male</option><option value="other">Prefer not to say</option></select><div class="ferr" id="err-gender">Required</div></div>
     </div>
     <div class="fg">
@@ -425,7 +425,11 @@ const STEPS_META = [
   {title:'Lifestyle',sub:'Weekends, deal-breakers'},
   {title:'Bio & Review',sub:'Your story, preview'},
 ];
-
+// Set max DOB to 18 years ago dynamically
+const maxDob = new Date();
+maxDob.setFullYear(maxDob.getFullYear() - 18);
+document.getElementById('dob').max = maxDob.toISOString().split('T')[0];
+  
 const SCORE_ITEMS = [
   {key:'basic',    label:'Basic info',    pts:15, check:()=>profile.first_name&&profile.dob&&profile.city},
   {key:'career',   label:'Career',        pts:10, check:()=>profile.profession&&profile.education},
@@ -558,7 +562,7 @@ function saveProgress(silent=false){
 }
 
 async function submitProfile(){
-  collectStep(7);
+  for(let i=1;i<=7;i++) collectStep(i);
   const score=SCORE_ITEMS.reduce((s,item)=>s+(item.check()?item.pts:0),0);
   if(score<50){toast('Please complete more of your profile (need 50+ score)');return;}
   const btn=document.getElementById('submit-btn');btn.classList.add('loading');btn.disabled=true;
