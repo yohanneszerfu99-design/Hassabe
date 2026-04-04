@@ -411,6 +411,7 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
 <script>
 'use strict';
 const API = window.HASSABE_CONFIG.API;
+window.Auth.requireAuth('/auth.html');
 let currentStep = 1;
 const TOTAL = 7;
 const profile = { seeking:'men', ethnicity:['ethiopian'], languages:['english','amharic'], heritage_strength:5, practice_level:'very_practicing', faith_match_importance:3, relationship_goal:'marriage_now', marital_history:'never', children_preference:'want_2_3', weekend_activities:['family','church'], deal_breakers:['smoking'] };
@@ -561,9 +562,24 @@ async function submitProfile(){
   const score=SCORE_ITEMS.reduce((s,item)=>s+(item.check()?item.pts:0),0);
   if(score<50){toast('Please complete more of your profile (need 50+ score)');return;}
   const btn=document.getElementById('submit-btn');btn.classList.add('loading');btn.disabled=true;
-       const res=await fetch(`${API}/api/profile`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({...profile,profile_score:score})});
-     if(!res.ok){const d=await res.json();toast(d.error||'Save failed');btn.classList.remove('loading');btn.disabled=false;return;}
-  await sleep(1500);
+  try {
+    const res = await window.api('/api/profile', {
+      method: 'POST',
+      body: JSON.stringify({...profile, profile_score: score})
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      toast(d.error || 'Save failed. Please try again.');
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      return;
+    }
+  } catch(e) {
+    toast('Connection error. Please try again.');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    return;
+  }
   btn.classList.remove('loading');
   localStorage.removeItem('hassabe_profile_draft');
   showStep(8);
