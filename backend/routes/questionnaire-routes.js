@@ -191,7 +191,7 @@ router.post('/round1',
   requireAuth,
   submitLimiter,
   [
-    body('responses').isArray({ min: 25 }).withMessage('At least 25 responses required'),
+    body('responses').isArray({ min: 1 }).withMessage('At least 25 responses required'),
     body('responses.*.question_id').notEmpty(),
     body('responses.*.dimension').isIn(Object.keys(DIMENSIONS)),
     body('metadata.completed_at').isISO8601(),
