@@ -17,7 +17,6 @@ require('dotenv').config();
 
 const express    = require('express');
 const { Pool }   = require('pg');
-const multer     = require('multer');
 const cloudinary = require('cloudinary').v2;
 const jwt        = require('jsonwebtoken');
 const rateLimit  = require('express-rate-limit');
