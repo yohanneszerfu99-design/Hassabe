@@ -107,7 +107,7 @@ router.post('/login', authLimiter, [body('email').isEmail().normalizeEmail(), bo
   const { email, password, totpCode } = req.body;
   try {
     const { rows } = await pool.query(
-      'SELECT id, email, password_hash, status, email_verified, tfa_enabled, tfa_secret FROM users WHERE email=$1',
+     'SELECT id, email, password_hash, status, email_verified, tfa_enabled, tfa_secret, is_admin FROM users WHERE email=$1',
       [email]
     );
     const user = rows[0];
@@ -125,7 +125,7 @@ router.post('/login', authLimiter, [body('email').isEmail().normalizeEmail(), bo
     await pool.query('UPDATE users SET last_login_at=now() WHERE id=$1', [user.id]);
     const access = signAccess(user.id), refresh = signRefresh(user.id);
     await storeRefresh(user.id, refresh);
-    res.json({ accessToken: access, refreshToken: refresh, userId: user.id });
+    res.json({ accessToken: access, refreshToken: refresh, userId: user.id, isAdmin: user.is_admin });
   } catch (e) { res.status(500).json({ error: 'Login failed. Please try again.' }); }
 });
 
