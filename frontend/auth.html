@@ -4,7 +4,7 @@
 <script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe — Sign In</title>
+<title>Hassabe ሃሳቤ — Sign In</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -116,7 +116,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
 /* Password toggle */
 .input-wrap{position:relative}
 .input-wrap .form-input{padding-right:44px}
-.pw-toggle{
+.pw-toggle{z-index:2;position:relative;
   position:absolute;right:12px;top:50%;transform:translateY(-50%);
   background:none;border:none;cursor:pointer;
   color:#B5A88C;font-size:15px;padding:4px;
@@ -214,7 +214,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
 
 /* ── CHECKBOX ── */
 .check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:18px}
-.check-box{
+.check-box{cursor:pointer;position:relative;z-index:1;
   width:18px;height:18px;border:.5px solid rgba(139,105,20,.35);
   border-radius:2px;background:#fff;flex-shrink:0;margin-top:2px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -509,7 +509,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         </div>
 
         <h1 class="auth-heading">Check your<br><em>email</em></h1>
-        <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address">you@example.com</strong>. Enter it below to verify your account.</p>
+        <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2851475d684d50494558444d064b4745">[email&#160;protected]</a></strong>. Enter it below to verify your account.</p>
 
         <div class="otp-group">
           <input class="otp-input" type="text" maxlength="1" id="otp0" oninput="otpInput(this,0)" onkeydown="otpKey(this,0,event)">
@@ -670,7 +670,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         <div class="success-wrap">
           <div class="success-icon">✉️</div>
           <h2>Check your email</h2>
-          <p>We sent a password reset link to <strong id="reset-email-shown">you@example.com</strong>. The link expires in 1 hour.</p>
+          <p>We sent a password reset link to <strong id="reset-email-shown"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2a53455f6a4f524b475a464f04494547">[email&#160;protected]</a></strong>. The link expires in 1 hour.</p>
           <button class="btn btn-outline" onclick="showScreen('screen-login')">← Back to sign in</button>
           <div class="resend-row" style="margin-top:16px">Didn't get it? <button class="resend-btn" onclick="doForgot()">Resend link</button></div>
         </div>
@@ -770,7 +770,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
 
 <div id="toast"></div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 'use strict';
 
 /* ── STATE ── */
@@ -934,17 +934,24 @@ async function doSignup() {
 
   setLoading('btn-signup', true);
 
-  /* ──────────────────────────────────────────────
-     PRODUCTION: Replace this block with your API call
-     const res = await fetch('/api/auth/register', {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ name, email, password: pw })
-     });
-     const data = await res.json();
-     if (!res.ok) { showErr('err-su-email', data.message); setLoading(..., false); return; }
-  ────────────────────────────────────────────── */
-  await sleep(1200); // simulate API call
+  try {
+    const res  = await window.api('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password: pw })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showErr('err-su-email', data.error || 'Registration failed. Please try again.');
+      setLoading('btn-signup', false);
+      return;
+    }
+    window._signupUserId = data.userId;
+  } catch(e) {
+    showErr('err-su-email', 'Connection error. Please try again.');
+    setLoading('btn-signup', false);
+    return;
+  }
+
   setLoading('btn-signup', false);
 
   if (isEmail) {
@@ -970,24 +977,28 @@ async function doVerifyEmail() {
 
   setLoading('btn-verify', true);
 
-  const res = await fetch('/api/auth/verify-email', {
-       method: 'POST', headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ email: signupData.email, code })
-     });
-  await sleep(1000);
-  setLoading('btn-verify', false);
-
-  // Demo: accept 123456 or any 6-digit code
-  if (code === '000000') {
-    showErr('err-otp', 'Incorrect code. Try 123456 for the demo.');
-    clearOtp('');
-    document.getElementById('otp0')?.focus();
-    return;
+  try {
+    const userId = window._signupUserId;
+    const res  = await window.api('/api/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ userId, code })
+    });
+    const data = await res.json();
+    setLoading('btn-verify', false);
+    if (!res.ok) {
+      showErr('err-otp', data.error || 'Invalid code. Please try again.');
+      clearOtp('');
+      document.getElementById('otp0')?.focus();
+      return;
+    }
+    window.Auth.save(data);
+    clearResendTimer();
+    showScreen('screen-verified');
+    showToast('✓ Email verified successfully');
+  } catch(e) {
+    setLoading('btn-verify', false);
+    showErr('err-otp', 'Connection error. Please try again.');
   }
-
-  clearResendTimer();
-  showScreen('screen-verified');
-  showToast('✓ Email verified successfully');
 }
 
 function doVerifyPhone() {
@@ -1009,28 +1020,28 @@ async function doLogin() {
 
   setLoading('btn-login', true);
 
-  const res = await fetch('/api/auth/login', {
-       method: 'POST', headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ email, password: pw })
-     });
-     const data = await res.json();
-     if (!res.ok) { showErr('err-login-password', data.message); setLoading('btn-login', false); return; }
-     localStorage.setItem('hassabe_token', data.accessToken);
-     localStorage.setItem('hassabe_refresh', data.refreshToken);
-     if (data.requires2FA) { showScreen('screen-2fa'); return; }
-  await sleep(1200);
-  setLoading('btn-login', false);
-
-  // Demo: show 2FA for "2fa@example.com", otherwise go to dashboard
-  if (email.includes('2fa')) {
-    showScreen('screen-2fa');
-    document.getElementById('tfa0')?.focus();
-  } else {
-    const firstName = email.split('@')[0].split('.')[0];
-    document.getElementById('loggedin-name').innerHTML =
-      `Welcome back, <strong>${capitalize(firstName)}</strong>. Your Hassabe account is active and your session is secure.`;
-    showScreen('screen-loggedin');
-    showToast('✓ Signed in successfully');
+  try {
+    const res  = await window.api('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password: pw })
+    });
+    const data = await res.json();
+    setLoading('btn-login', false);
+    if (!res.ok) {
+      showErr('err-login-password', data.error || 'Incorrect email or password.');
+      return;
+    }
+    window.Auth.save(data);
+    if (data.requires2FA) {
+      showScreen('screen-2fa');
+      document.getElementById('tfa0')?.focus();
+      return;
+    }
+    showToast('✓ Signed in');
+    window.location.href = '/matches.html';
+  } catch(e) {
+    setLoading('btn-login', false);
+    showErr('err-login-password', 'Connection error. Please try again.');
   }
 }
 
@@ -1158,6 +1169,8 @@ function resendCode() {
 
 /* ── ONBOARDING REDIRECT ── */
 function goToOnboarding() {
+  window.location.href = '/onboarding.html';
+  return;
   showToast('Taking you to profile setup...');
   window.location.href = '/onboarding';
   setTimeout(() => {
@@ -1167,16 +1180,4 @@ function goToOnboarding() {
 
 /* ── HELPERS ── */
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; }
-
-let toastT;
-function showToast(msg, type = '') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show' + (type === 'error' ? ' error' : '');
-  clearTimeout(toastT);
-  toastT = setTimeout(() => t.classList.remove('show'), 3000);
-}
-</script>
-</body>
-</html>
+function capitalize(s) { return s ? s[0].
