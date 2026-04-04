@@ -395,6 +395,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webkit-f
    Replace with your Railway backend URL from Step 2
    ══════════════════════════════════════════════════ */
 const API = window.HASSABE_CONFIG.API;
+if (!window.Auth.requireAuth()) throw 0;
 
 /* ══════════════════════════════════════════════════
    DIMENSIONS — 8 scoring categories
@@ -1220,24 +1221,24 @@ async function submitQuestionnaire() {
     },
   };
 
-  — send to backend:
-          const res = await fetch(`${API}/api/questionnaire/round1`, {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-         'Authorization': `Bearer ${token}`
-       },
-       body: JSON.stringify(payload)
-     });
-     if (!res.ok) {
-       const err = await res.json();
-       toast(err.error || 'Submission failed');
-       btn.classList.remove('loading');
-       btn.disabled = false;
-       return;
-     }
-
-  await sleep(1800); // simulate API + embedding generation
+  try {
+    const res = await window.api('/api/questionnaire/round1', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      toast(err.error || 'Submission failed. Please try again.');
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      return;
+    }
+  } catch(e) {
+    toast('Connection error. Please try again.');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+    return;
+  }
 
   // Clear draft
   localStorage.removeItem('hassabe_q1_draft');
@@ -1270,8 +1271,7 @@ function formatAnswerText(q, qi) {
 }
 
 function goToDashboard() {
-  window.location.href = '/dashboard';
-  toast('In production: redirects to your match dashboard');
+  window.location.href = '/matches.html';
 }
 
 /* ══════════════════════════════════════════════════
