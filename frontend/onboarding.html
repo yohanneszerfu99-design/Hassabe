@@ -154,7 +154,7 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
       <div class="fg"><label class="fl">Last Name</label><input class="fi" id="last-name" type="text" placeholder="Tesfaye"><div class="ferr" id="err-last-name">Required</div></div>
     </div>
     <div class="fg-row">
-      <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="dob" type="date" id="dob-input"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
+      <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="dob" type="date"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
       <div class="fg"><label class="fl">Gender</label><select class="fi-select" id="gender"><option value="">Select…</option><option value="female">Female</option><option value="male">Male</option><option value="other">Prefer not to say</option></select><div class="ferr" id="err-gender">Required</div></div>
     </div>
     <div class="fg">
@@ -569,7 +569,7 @@ async function submitProfile(){
   try {
     const res = await window.api('/api/profile', {
       method: 'POST',
-      body: JSON.stringify({...profile, profile_score: score})
+      body: JSON.stringify({...profile, date_of_birth: profile.dob, profile_score: score})
     });
     if (!res.ok) {
       const d = await res.json();
