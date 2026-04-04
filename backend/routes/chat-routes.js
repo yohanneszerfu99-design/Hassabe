@@ -182,8 +182,7 @@ router.get('/:matchId/icebreakers',
 router.post('/:matchId/voice',
   requireAuth,
   voiceLimiter,
-  upload.single('audio'),
-  [param('matchId').isUUID()],
+   [param('matchId').isUUID()],
   async (req, res) => {
     const err = checkValidation(req, res);
     if (err) return;
