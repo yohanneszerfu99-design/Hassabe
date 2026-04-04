@@ -777,6 +777,18 @@ let saveTimer  = null;
 let lastDimIdx = -1;
 let dragSrc    = null;
 
+  /* ── dimension heading copy ── */
+const dimHeadings = {
+  values:        { title:'Core', sub:'Values',        desc:'What you value, how you handle conflict, and the qualities you seek — these form the bedrock of long-term compatibility.' },
+  culture:       { title:'Cultural', sub:'Identity',  desc:'Your relationship with your roots shapes how you live, who you love, and what home means to you.' },
+  faith:         { title:'Faith &', sub:'Religion',   desc:'Faith is central to many in our community. These questions carry significant weight in the matching engine.' },
+  family:        { title:'Family &', sub:'Community', desc:'How you relate to family — and what you expect of a partner around family — is one of the clearest compatibility signals.' },
+  communication: { title:'Communication', sub:'Style', desc:'How you express yourself and connect emotionally determines whether a relationship feels safe and alive.' },
+  goals:         { title:'Life', sub:'Goals',         desc:'Shared or compatible life-direction matters more than shared hobbies. These questions shape your long-term match pool.' },
+  lifestyle:     { title:'Daily', sub:'Lifestyle',    desc:'Day-to-day habits and rhythms — your social energy, how you spend time, what a home feels like.' },
+  dealbreakers:  { title:'Priorities &', sub:'Limits', desc:'Your hard limits protect your time and everyone else\'s. The AI engine filters hard before it scores.' },
+};
+
 /* ══════════════════════════════════════════════════
    INIT
    ══════════════════════════════════════════════════ */
@@ -909,18 +921,6 @@ function renderQuestion(qi) {
   document.getElementById('right-panel').scrollTop = 0;
   updateProgress();
 }
-
-/* ── dimension heading copy ── */
-const dimHeadings = {
-  values:        { title:'Core', sub:'Values',        desc:'What you value, how you handle conflict, and the qualities you seek — these form the bedrock of long-term compatibility.' },
-  culture:       { title:'Cultural', sub:'Identity',  desc:'Your relationship with your roots shapes how you live, who you love, and what home means to you.' },
-  faith:         { title:'Faith &', sub:'Religion',   desc:'Faith is central to many in our community. These questions carry significant weight in the matching engine.' },
-  family:        { title:'Family &', sub:'Community', desc:'How you relate to family — and what you expect of a partner around family — is one of the clearest compatibility signals.' },
-  communication: { title:'Communication', sub:'Style', desc:'How you express yourself and connect emotionally determines whether a relationship feels safe and alive.' },
-  goals:         { title:'Life', sub:'Goals',         desc:'Shared or compatible life-direction matters more than shared hobbies. These questions shape your long-term match pool.' },
-  lifestyle:     { title:'Daily', sub:'Lifestyle',    desc:'Day-to-day habits and rhythms — your social energy, how you spend time, what a home feels like.' },
-  dealbreakers:  { title:'Priorities &', sub:'Limits', desc:'Your hard limits protect your time and everyone else\'s. The AI engine filters hard before it scores.' },
-};
 
 /* ── render answer area by type ── */
 function renderAnswerArea(q, qi) {
