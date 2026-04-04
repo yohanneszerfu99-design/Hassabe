@@ -395,7 +395,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webkit-f
    Replace with your Railway backend URL from Step 2
    ══════════════════════════════════════════════════ */
 const API = window.HASSABE_CONFIG.API;
-if (!window.Auth.requireAuth()) throw 0;
+if (!window.Auth.getToken()) { window.location.href = '/auth.html'; }
 
 /* ══════════════════════════════════════════════════
    DIMENSIONS — 8 scoring categories
