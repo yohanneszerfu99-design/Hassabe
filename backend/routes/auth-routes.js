@@ -23,8 +23,8 @@ const JWT_OPT = { issuer: 'hassabe.com', audience: 'hassabe-api' };
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, message: { error: 'Too many attempts. Try again soon.' } });
 const otpLimiter  = rateLimit({ windowMs: 60 * 1000, max: 10 });
 
-function signAccess(id)  { return jwt.sign({ sub: id }, SECRET, { ...JWT_OPT, expiresIn: '15m' }); }
-function signRefresh(id) { return jwt.sign({ sub: id }, SECRET, { ...JWT_OPT, expiresIn: '30d' }); }
+function signAccess(id)  { return jwt.sign({ sub: id }, SECRET, { ...JWT_OPT, expiresIn: '24h' }); }
+function signRefresh(id) { return jwt.sign({ sub: id }, SECRET, { ...JWT_OPT, expiresIn: '360d' }); }
 function hashToken(t)    { return crypto.createHash('sha256').update(t).digest('hex'); }
 
 async function storeRefresh(userId, token) {
