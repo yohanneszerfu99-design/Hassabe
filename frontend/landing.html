@@ -429,8 +429,8 @@ footer{padding:42px 52px;border-top:.5px solid rgba(201,168,76,.09);display:flex
 
    SITE_URL     : Your deployed URL (for share links)
    ══════════════════════════════════════════════════ */
-const FORMSPREE_ID = 'YOUR_FORM_ID';
-const SITE_URL     = 'https://hassabe.com';
+const FORMSPREE_ID = 'xpqyeyow';
+const SITE_URL     = 'https://hassabe.com/landing.html';
 
 /* ── PARTICLES ── */
 (function(){
@@ -495,7 +495,7 @@ async function joinList(src){
   /* ── Send to Formspree if configured ── */
   if(FORMSPREE_ID&&FORMSPREE_ID!=='YOUR_FORM_ID'){
     try{
-      await fetch(`https://formspree.io/f/${FORMSPREE_ID}`,{
+      await fetch(`https://formspree.io/f/${xpqyeyow}`,{
         method:'POST',
         headers:{'Content-Type':'application/json','Accept':'application/json'},
         body:JSON.stringify(payload)
