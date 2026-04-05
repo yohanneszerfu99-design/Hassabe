@@ -508,7 +508,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         </div>
 
         <h1 class="auth-heading">Check your<br><em>email</em></h1>
-        <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address"><a href="/cdn-cgi/l/email-protection#fc9d98919592bc949d8f8f9d9e99d29f9391"><span class="__cf_email__" data-cfemail="056461686c6b456d6476766467602b666a68">[email&#160;protected]</span></a></strong>. Enter it below to verify your account.</p>
+        <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address"><a href="mailto:admin@hassabe.com"><span class="__cf_email__" data-cfemail="056461686c6b456d6476766467602b666a68">[email&#160;protected]</span></a></strong>. Enter it below to verify your account.</p>
 
         <div class="otp-group">
           <input class="otp-input" type="text" maxlength="1" id="otp0" oninput="otpInput(this,0)" onkeydown="otpKey(this,0,event)">
@@ -669,7 +669,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         <div class="success-wrap">
           <div class="success-icon">✉️</div>
           <h2>Check your email</h2>
-          <p>We sent a password reset link to <strong id="reset-email-shown"><a href="/cdn-cgi/l/email-protection#553431383c3b153d3426263437307b363a38"><span class="__cf_email__" data-cfemail="7c1d181115123c141d0f0f1d1e19521f1311">[email&#160;protected]</span></a></strong>. The link expires in 1 hour.</p>
+          <p>We sent a password reset link to <strong id="reset-email-shown"><a href="mailto:admin@hassabe.com"><span class="__cf_email__" data-cfemail="7c1d181115123c141d0f0f1d1e19521f1311">[email&#160;protected]</span></a></strong>. The link expires in 1 hour.</p>
           <button class="btn btn-outline" onclick="showScreen('screen-login')">← Back to sign in</button>
           <div class="resend-row" style="margin-top:16px">Didn't get it? <button class="resend-btn" onclick="doForgot()">Resend link</button></div>
         </div>
@@ -767,9 +767,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
   </div><!-- /panel-right -->
 </div><!-- /shell -->
 
-<div id="toast"></div>
-
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<div id="toast"></div><script>
 'use strict';
 
 /* ── STATE ── */
@@ -1182,4 +1180,17 @@ let toastTimer;
 function showToast(msg, type) {
   const t = document.getElementById('toast');
   if (!t) return;
-  t.textCont
+  t.textContent = msg;
+  t.className = 'toast show' + (type === 'error' ? ' toast-error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
