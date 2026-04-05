@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  HASSABE — Auth Routes  (mounted at /api/auth in server.js)
+//  HASSABE —  Auth Routes  (mounted at /api/auth in server.js)
 // ═══════════════════════════════════════════════════════════════
 require('dotenv').config();
 const express    = require('express');
