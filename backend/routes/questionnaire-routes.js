@@ -604,6 +604,55 @@ async function queueFinalScoringJob(matchId) {
   console.log(`[Scoring Queue] Queued final scoring for match ${matchId}`);
 }
 
+
+// ══════════════════════════════════════════════════════════════
+//  POST /api/questionnaire/admin/regenerate-all-embeddings
+//  Admin: regenerate missing embeddings for all users
+// ══════════════════════════════════════════════════════════════
+router.post('/admin/regenerate-all-embeddings', requireAdmin, async (req, res) => {
+  try {
+    const missing = await pool.query(`
+      SELECT id, user_id, narrative_text
+      FROM questionnaire_responses
+      WHERE round = 1
+        AND status = 'complete'
+        AND embedding IS NULL
+        AND narrative_text IS NOT NULL
+    `);
+
+    if (!missing.rows.length) {
+      return res.json({ message: 'No missing embeddings found.', processed: 0 });
+    }
+
+    const results = [];
+    for (const row of missing.rows) {
+      try {
+        const embedding = await generateEmbedding(row.narrative_text);
+        await pool.query(
+          `UPDATE questionnaire_responses
+           SET embedding = $1::vector, embedding_model = 'text-embedding-3-large', updated_at = now()
+           WHERE id = $2`,
+          [`[${embedding.join(',')}]`, row.id]
+        );
+        await pool.query(
+          `UPDATE profiles SET matching_pool = true WHERE user_id = $1 AND profile_score >= 70`,
+          [row.user_id]
+        );
+        results.push({ userId: row.user_id, status: 'ok', dims: embedding.length });
+        console.log(`[Admin Regen] Embedding generated for user ${row.user_id}`);
+      } catch (err) {
+        results.push({ userId: row.user_id, status: 'failed', error: err.message });
+        console.error(`[Admin Regen] Failed for user ${row.user_id}:`, err.message);
+      }
+    }
+
+    res.json({ message: 'Done.', processed: results.length, results });
+  } catch (err) {
+    console.error('Admin regen error:', err);
+    res.status(500).json({ error: 'Bulk regeneration failed' });
+  }
+});
+
 module.exports = router;
 
 // ══════════════════════════════════════════════════════════════
