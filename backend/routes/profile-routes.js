@@ -73,15 +73,12 @@ function checkValidation(req, res) {
 function calculateProfileScore(p) {
   let score = 0;
   const checks = [
-    { pts: 15, pass: p.first_name && p.last_name && p.date_of_birth && p.city && p.country },
-    { pts: 10, pass: p.profession && p.education_level },
+    { pts: 20, pass: p.first_name && p.last_name && p.date_of_birth && p.city && p.country },
+    { pts: 15, pass: p.profession && p.education_level },
     { pts: 10, pass: p.ethnicity?.length > 0 },
-    { pts: 15, pass: !!p.religion },
+    { pts: 20, pass: !!p.religion },
     { pts: 10, pass: !!p.relationship_goal },
-    { pts: 20, pass: p.bio && p.bio.length >= 80 },
-    { pts:  5, pass: p.photos?.length >= 1 },
-    { pts: 10, pass: p.photos?.length >= 3 },
-    { pts:  5, pass: !!p.video_intro_url },
+    { pts: 25, pass: p.bio && p.bio.length >= 80 },
   ];
   checks.forEach(c => { if (c.pass) score += c.pts; });
   return score;
