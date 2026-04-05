@@ -101,7 +101,7 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webk
 
 <script>
 'use strict';
-if (!window.Auth.requireAuth('/auth.html')) { throw 0; }
+if (!window.Auth.getToken()) { window.location.href = '/auth.html'; }
 
 let allMatches = [], activeStatus = '';
 
