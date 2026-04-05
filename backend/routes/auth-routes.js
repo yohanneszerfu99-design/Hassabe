@@ -53,14 +53,14 @@ function ok(req, res) {
 
 // POST /register
 router.post('/register', authLimiter, [
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail().customSanitizer(e => e.toLowerCase().trim()),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('name').trim().isLength({ min: 2 }).withMessage('Name is required'),
 ], async (req, res) => {
   if (!ok(req, res)) return;
   const { email, password, name } = req.body;
   try {
-    if ((await pool.query('SELECT id FROM users WHERE email = $1', [email])).rows[0])
+    if ((await pool.query('SELECT id FROM public.users WHERE LOWER(email) = LOWER($1)', [email])).rows[0])
       return res.status(409).json({ error: 'An account with this email already exists.' });
 
     const hash = await bcrypt.hash(password, 12);
@@ -102,12 +102,12 @@ router.post('/verify-email', otpLimiter, [body('userId').isUUID(), body('code').
 });
 
 // POST /login
-router.post('/login', authLimiter, [body('email').isEmail().normalizeEmail(), body('password').notEmpty()], async (req, res) => {
+router.post('/login', authLimiter, [body('email').isEmail().customSanitizer(e => e.toLowerCase().trim()), body('password').notEmpty()], async (req, res) => {
   if (!ok(req, res)) return;
   const { email, password, totpCode } = req.body;
   try {
     const { rows } = await pool.query(
-     'SELECT id, email, password_hash, status, email_verified, tfa_enabled, tfa_secret, is_admin FROM users WHERE email=$1',
+     'SELECT id, email, password_hash, status, email_verified, tfa_enabled, tfa_secret, is_admin FROM public.users WHERE LOWER(email)=LOWER($1)',
       [email]
     );
     const user = rows[0];
@@ -155,11 +155,11 @@ router.post('/logout', requireAuth, async (req, res) => {
 });
 
 // POST /forgot-password
-router.post('/forgot-password', authLimiter, [body('email').isEmail().normalizeEmail()], async (req, res) => {
+router.post('/forgot-password', authLimiter, [body('email').isEmail().customSanitizer(e => e.toLowerCase().trim())], async (req, res) => {
   if (!ok(req, res)) return;
   res.json({ message: 'If an account exists with that email, a reset code has been sent.' });
   try {
-    const { rows } = await pool.query('SELECT id, name FROM users WHERE email=$1 AND email_verified=true', [req.body.email]);
+    const { rows } = await pool.query('SELECT id, name FROM public.users WHERE LOWER(email)=LOWER($1) AND email_verified=true', [req.body.email]);
     if (!rows[0]) return;
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     await pool.query(`INSERT INTO verification_codes (user_id, code, type) VALUES ($1, $2, 'password_reset')`, [rows[0].id, code]);
@@ -174,14 +174,14 @@ router.post('/forgot-password', authLimiter, [body('email').isEmail().normalizeE
 
 // POST /reset-password
 router.post('/reset-password', authLimiter, [
-  body('email').isEmail().normalizeEmail(),
+  body('email').isEmail().customSanitizer(e => e.toLowerCase().trim()),
   body('code').isLength({ min:6, max:6 }),
   body('newPassword').isLength({ min:8 }),
 ], async (req, res) => {
   if (!ok(req, res)) return;
   const { email, code, newPassword } = req.body;
   try {
-    const { rows } = await pool.query('SELECT id FROM users WHERE email=$1', [email]);
+    const { rows } = await pool.query('SELECT id FROM public.users WHERE LOWER(email)=LOWER($1)', [email]);
     if (!rows[0]) return res.status(400).json({ error: 'Invalid request.' });
     const vc = await pool.query(
       `SELECT id FROM verification_codes WHERE user_id=$1 AND code=$2 AND type='password_reset' AND used=false AND expires_at>now()`,
