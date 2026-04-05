@@ -238,13 +238,24 @@ const MOCK_HISTORY = [
 /* ══════════════════════════════════════════════════════════
    CHECKOUT SCREEN
    ══════════════════════════════════════════════════════════ */
-function renderCheckout(mId) {
-  — fetch match data:
-     const res = await fetch(`${API}/api/matches/${mId}`, {
-       headers: { 'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}` }
-     });
-     const { match } = await res.json();
-  const match = MOCK_MATCH;
+async function renderCheckout(mId) {
+  let match = MOCK_MATCH;
+  try {
+    const res = await fetch(`${API}/api/matches/${mId}`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const m = data.match || data;
+      match = {
+        id:              mId,
+        score:           Math.round((m.score || m.r1_score || 0) * 100) || 0,
+        partnerName:     m.person?.firstName || 'Your Match',
+        partnerInitials: (m.person?.firstName || 'M')[0].toUpperCase(),
+        partnerSub:      [m.person?.age, m.person?.profession, m.person?.city].filter(Boolean).join(' · '),
+      };
+    }
+  } catch (e) { /* use mock fallback */ }
 
   document.getElementById('inner').innerHTML = `
     <div class="screen active" id="screen-checkout">
@@ -265,7 +276,7 @@ function renderCheckout(mId) {
       <!-- Price card -->
       <div class="price-card">
         <div class="price-eyebrow">One-time unlock</div>
-        <div><span class="price-currency">$</span><span class="price-amount">79</span><span class="price-currency">.99</span></div>
+        <div><span class="price-currency">$</span><span class="price-amount">49</span><span class="price-currency">.99</span></div>
         <div class="price-desc">Unlock your private conversation with ${match.partnerName}. No subscription. No recurring charges.</div>
 
         <div class="feature-list">
@@ -302,27 +313,22 @@ async function startCheckout(mId) {
   btn.disabled = true;
 
   try {
-    — create checkout session:
-       const res = await fetch(`${API}/api/payments/checkout/${mId}`, {
-         method: 'POST',
-         headers: {
-           'Content-Type': 'application/json',
-           'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}`
-         }
-       });
-       if (!res.ok) {
-         const err = await res.json();
-         toast(err.error || 'Payment failed to start. Please try again.');
-         btn.classList.remove('loading'); btn.disabled = false;
-         return;
-       }
-       const { checkoutUrl } = await res.json();
-       window.location.href = checkoutUrl; // redirect to Stripe
-
-    // Simulate for demo
+    const res = await fetch(`${API}/api/payments/checkout/${mId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}`
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      toast(err.error || 'Payment failed to start. Please try again.');
+      btn.classList.remove('loading'); btn.disabled = false;
+      return;
+    }
+    const { checkoutUrl } = await res.json();
     showProcessing();
-    await sleep(1500);
-    renderSuccess({ demo: true, partnerName: MOCK_MATCH.partnerName, score: MOCK_MATCH.score });
+    window.location.href = checkoutUrl;
 
   } catch (err) {
     toast('Something went wrong. Please try again.');
@@ -348,14 +354,21 @@ function showProcessing() {
    SUCCESS SCREEN
    ══════════════════════════════════════════════════════════ */
 async function renderSuccess(data = {}) {
-  — verify session and get match data:
-     const res = await fetch(`${API}/api/payments/verify-session?session_id=${sessionId}`, {
-       headers: { 'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}` }
-     });
-     const { payment, match } = await res.json();
-  const partnerName = data.partnerName || 'your match';
-  const score       = data.score || 91;
-  const amount      = '$49.99';
+  let partnerName = data.partnerName || 'your match';
+  let score       = data.score || 0;
+  const amount    = '$49.99';
+  if (sessionId) {
+    try {
+      const res = await fetch(`${API}/api/payments/verify-session?session_id=${sessionId}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}` }
+      });
+      if (res.ok) {
+        const { payment, match: m } = await res.json();
+        if (m?.person?.firstName) partnerName = m.person.firstName;
+        if (m?.score)             score       = Math.round(m.score * 100);
+      }
+    } catch (e) { /* use defaults */ }
+  }
   const now         = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
   const receiptId   = `#${Math.random().toString(36).slice(2,10).toUpperCase()}`;
 
@@ -420,11 +433,16 @@ function renderCancelled() {
    PAYMENT HISTORY
    ══════════════════════════════════════════════════════════ */
 async function renderHistory() {
-  const res = await fetch(`${API}/api/payments/history`, {
-       headers: { 'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}` }
-     });
-     const { payments } = await res.json();
-  const payments = MOCK_HISTORY;
+  let payments = [];
+  try {
+    const res = await fetch(`${API}/api/payments/history`, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('hassabe_token')}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      payments = data.payments || [];
+    }
+  } catch (e) { payments = []; }
 
   const itemsHtml = payments.length
     ? payments.map(p => {
