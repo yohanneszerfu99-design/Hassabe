@@ -508,7 +508,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         </div>
 
         <h1 class="auth-heading">Check your<br><em>email</em></h1>
-        <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address"><a href="mailto:admin@hassabe.com">admin@hassabe.com</a></strong>. Enter it below to verify your account.</p>
+        <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address"><a href="/cdn-cgi/l/email-protection#fc9d98919592bc949d8f8f9d9e99d29f9391"><span class="__cf_email__" data-cfemail="056461686c6b456d6476766467602b666a68">[email&#160;protected]</span></a></strong>. Enter it below to verify your account.</p>
 
         <div class="otp-group">
           <input class="otp-input" type="text" maxlength="1" id="otp0" oninput="otpInput(this,0)" onkeydown="otpKey(this,0,event)">
@@ -669,7 +669,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         <div class="success-wrap">
           <div class="success-icon">✉️</div>
           <h2>Check your email</h2>
-          <p>We sent a password reset link to <strong id="reset-email-shown"><a href="mailto:admin@hassabe.com">admin@hassabe.com</a></strong>. The link expires in 1 hour.</p>
+          <p>We sent a password reset link to <strong id="reset-email-shown"><a href="/cdn-cgi/l/email-protection#553431383c3b153d3426263437307b363a38"><span class="__cf_email__" data-cfemail="7c1d181115123c141d0f0f1d1e19521f1311">[email&#160;protected]</span></a></strong>. The link expires in 1 hour.</p>
           <button class="btn btn-outline" onclick="showScreen('screen-login')">← Back to sign in</button>
           <div class="resend-row" style="margin-top:16px">Didn't get it? <button class="resend-btn" onclick="doForgot()">Resend link</button></div>
         </div>
@@ -769,7 +769,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
 
 <div id="toast"></div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 'use strict';
 
 /* ── STATE ── */
@@ -934,8 +934,9 @@ async function doSignup() {
   setLoading('btn-signup', true);
 
   try {
-    const res  = await window.api('/api/auth/register', {
+    const res  = await fetch(window.HASSABE_CONFIG.API + '/api/auth/register', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password: pw })
     });
     const data = await res.json();
@@ -978,8 +979,9 @@ async function doVerifyEmail() {
 
   try {
     const userId = window._signupUserId;
-    const res  = await window.api('/api/auth/verify-email', {
+    const res  = await fetch(window.HASSABE_CONFIG.API + '/api/auth/verify-email', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, code })
     });
     const data = await res.json();
@@ -1020,8 +1022,9 @@ async function doLogin() {
   setLoading('btn-login', true);
 
   try {
-    const res  = await window.api('/api/auth/login', {
+    const res  = await fetch(window.HASSABE_CONFIG.API + '/api/auth/login', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pw })
     });
     const data = await res.json();
@@ -1031,6 +1034,7 @@ async function doLogin() {
       return;
     }
     window.Auth.save(data);
+    if (data.isAdmin) localStorage.setItem('hassabe_is_admin', 'true');
     if (data.requires2FA) {
       showScreen('screen-2fa');
       document.getElementById('tfa0')?.focus();
@@ -1178,18 +1182,4 @@ let toastTimer;
 function showToast(msg, type) {
   const t = document.getElementById('toast');
   if (!t) return;
-  t.textContent = msg;
-  t.className = 'toast show' + (type === 'error' ? ' error' : '');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-function capitalize(s) {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-</script>
-</body>
-</html>
+  t.textCont
