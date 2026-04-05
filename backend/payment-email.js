@@ -132,7 +132,7 @@ async function sendReceiptEmail({ email, firstName, partnerName, amount, currenc
         .join('')}
     </div>
 
-    ${ctaButton('Open Your Conversation →', `${BASE}/messages?matchId=${matchId}`)}
+    ${ctaButton('Open Your Conversation →', `${BASE}/chat.html?matchId=${matchId}`)}
 
     ${divider()}
     <p style="font-size:12px;color:#9A8A72;line-height:1.7;margin:0">
