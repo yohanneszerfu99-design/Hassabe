@@ -1076,7 +1076,7 @@ async function doForgot() {
 
   setLoading('btn-forgot', true);
 
-  await fetch('/api/auth/forgot-password', {
+ await fetch(window.HASSABE_CONFIG.API + '/api/auth/forgot-password', {
        method:'POST', headers:{'Content-Type':'application/json'},
        body: JSON.stringify({ email })
      });
@@ -1097,7 +1097,7 @@ async function doReset() {
   if (pw !== confirm) { showErr('err-reset-confirm', 'Passwords do not match'); return; }
 
   const token = new URLSearchParams(window.location.search).get('token');
-     await fetch('/api/auth/reset-password', {
+     await fetch(window.HASSABE_CONFIG.API + '/api/auth/reset-password', {
        method:'POST', headers:{'Content-Type':'application/json'},
        body: JSON.stringify({ token, password: pw })
      });
