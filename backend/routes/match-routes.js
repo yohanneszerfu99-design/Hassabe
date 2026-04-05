@@ -108,8 +108,8 @@ router.get('/', requireAuth, matchLimiter, async (req, res) => {
         p.is_verified,
         date_part('year', age(p.date_of_birth))::int AS age,
 
-        -- First photo only for match card
-        (SELECT ph.url FROM profile_photos ph WHERE ph.profile_id = p.id ORDER BY ph.position LIMIT 1) AS photo_url,
+        -- No photos in this version
+        NULL AS photo_url,
 
         -- R2 completion status
         CASE WHEN m.user_a_id = $1 THEN m.r2_a_completed_at ELSE m.r2_b_completed_at END AS my_r2_completed_at,
@@ -195,14 +195,13 @@ router.get('/:id',
           p.ethnicity, p.languages, p.children_preference,
           p.heritage_strength, p.open_to_relocation,
           p.bio, p.profile_score, p.is_verified,
-          array_agg(ph.url ORDER BY ph.position) FILTER (WHERE ph.id IS NOT NULL) AS photos,
+          ARRAY[]::text[] AS photos,
           CASE WHEN m.user_a_id = $2 THEN m.r2_a_completed_at ELSE m.r2_b_completed_at END AS my_r2_at,
           CASE WHEN m.user_a_id = $2 THEN m.r2_b_completed_at ELSE m.r2_a_completed_at END AS their_r2_at
         FROM matches m
         JOIN profiles p ON p.user_id = (
           CASE WHEN m.user_a_id = $2 THEN m.user_b_id ELSE m.user_a_id END
         )
-        LEFT JOIN profile_photos ph ON ph.profile_id = p.id
         WHERE m.id = $1
           AND (m.user_a_id = $2 OR m.user_b_id = $2)
         GROUP BY m.id, p.id
