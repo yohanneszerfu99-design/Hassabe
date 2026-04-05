@@ -32,14 +32,20 @@
       "src": "/dashboard",
       "dest": "/matches.html"
     },
+    { "src": "/matches", 
+      "dest": "/matches.html" },
     {
       "src": "/profile",
       "dest": "/onboarding.html"
     },
+    { "src": "/payment", 
+      "dest": "/payment.html" },
     {
       "src": "/chat",
       "dest": "/chat.html"
     },
+    { "src": "/messages", 
+      "dest": "/chat.html" },
     {
       "src": "/admin",
       "dest": "/admin.html"
