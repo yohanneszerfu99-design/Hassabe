@@ -487,10 +487,8 @@ let isIbDismissed  = false;
    INIT
    ══════════════════════════════════════════════════ */
 (function init() {
-  renderConversationList();
   connectSocket();
-  // Auto-open first conversation in demo
-  setTimeout(() => openConversation(MOCK_CONVERSATIONS[0]), 400);
+  loadConversations();
 })();
 
 /* ══════════════════════════════════════════════════
@@ -498,12 +496,10 @@ let isIbDismissed  = false;
    ══════════════════════════════════════════════════ */
 function connectSocket() {
   socket = io(API, {
-       auth: { token: TOKEN },
-       transports: ['websocket', 'polling'],
-     });
-     bindSocketEvents();
-  // Demo: simulate socket with a mock object
-  socket = createMockSocket();
+    auth:       { token: TOKEN },
+    transports: ['websocket', 'polling'],
+  });
+  bindSocketEvents();
 }
 
 function bindSocketEvents() {
@@ -558,12 +554,55 @@ function bindSocketEvents() {
 /* ══════════════════════════════════════════════════
    CONVERSATION LIST
    ══════════════════════════════════════════════════ */
-function renderConversationList() {
+async function loadConversations() {
+  try {
+    const res  = await fetch(`${API}/api/matches`, {
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    const data = await res.json();
+    const unlocked = (data.matches || []).filter(m => m.status === 'messaging_unlocked');
+    renderConversationList(unlocked);
+
+    // Auto-open match from URL param
+    const urlMatchId = new URLSearchParams(window.location.search).get('matchId');
+    if (urlMatchId) {
+      const target = unlocked.find(m => m.id === urlMatchId);
+      if (target) setTimeout(() => openConversation(matchToConv(target)), 300);
+    } else if (unlocked.length > 0) {
+      setTimeout(() => openConversation(matchToConv(unlocked[0])), 300);
+    }
+  } catch (e) {
+    console.error('Failed to load conversations:', e);
+    document.getElementById('conv-count').textContent = 'Failed to load';
+  }
+}
+
+function matchToConv(m) {
+  return {
+    matchId:         m.id,
+    partnerName:     m.person?.firstName || 'Your Match',
+    partnerInitials: (m.person?.firstName || 'M')[0].toUpperCase(),
+    partnerSub:      [m.person?.age, m.person?.profession, m.person?.city].filter(Boolean).join(' · '),
+    score:           m.score || m.r1_score || 0,
+    expiresAt:       m.expiresAt,
+    icebreakers:     m.icebreakers || [],
+    lastMessage:     null,
+    lastTime:        m.matchedAt,
+    unread:          0,
+  };
+}
+
+function renderConversationList(convs) {
   const items = document.getElementById('conv-items');
   const count = document.getElementById('conv-count');
-  count.textContent = `${MOCK_CONVERSATIONS.length} active conversation${MOCK_CONVERSATIONS.length !== 1 ? 's' : ''}`;
+  count.textContent = `${convs.length} active conversation${convs.length !== 1 ? 's' : ''}`;
 
-  items.innerHTML = MOCK_CONVERSATIONS.map(c => `
+  if (!convs.length) {
+    items.innerHTML = '<div style="padding:24px 18px;font-size:13px;color:#B5A88C">No active conversations yet.</div>';
+    return;
+  }
+
+  items.innerHTML = convs.map(c => `
     <div class="conv-item" id="citem-${c.matchId}" onclick="openConversation(${JSON.stringify(c).replace(/"/g,'&quot;')})">
       <div class="conv-av">
         ${c.partnerInitials}
@@ -606,20 +645,40 @@ function openConversation(conv) {
   showLoading();
   hideTyping();
 
-  // Join via socket
+  // Join socket room
   joinRoom(conv.matchId);
 
-  // Demo: load mock messages after delay
-  setTimeout(() => {
-    messages = [...MOCK_MESSAGES];
+  // Load message history via REST
+  fetch(`${API}/api/chat/${conv.matchId}/messages`, {
+    headers: { 'Authorization': `Bearer ${TOKEN}` }
+  })
+  .then(r => r.ok ? r.json() : { messages: [] })
+  .then(data => {
+    messages = (data.messages || []).map(m => ({
+      id:       m.id,
+      senderId: m.sender_id || m.senderId,
+      content:  m.content,
+      type:     m.type || 'text',
+      sentAt:   m.sent_at || m.sentAt || m.created_at,
+      readAt:   m.read_at || m.readAt || null,
+      sending:  false,
+    }));
     renderMessages();
-    renderExpiryBar(conv.expiresAt, 28);
-    if (messages.length > 0) hideIcebreakers();
-    else if (!isIbDismissed) showIcebreakers(conv.icebreakers || []);
+    const daysLeft = conv.expiresAt
+      ? Math.max(0, Math.ceil((new Date(conv.expiresAt) - Date.now()) / 86400000))
+      : 30;
+    renderExpiryBar(conv.expiresAt, daysLeft);
+    if (messages.length === 0 && !isIbDismissed) showIcebreakers(conv.icebreakers || []);
+    else hideIcebreakers();
     hideLoading();
     scrollToBottom(false);
     markReadViaSocket(conv.matchId);
-  }, 600);
+  })
+  .catch(() => {
+    messages = [];
+    hideLoading();
+    if (!isIbDismissed) showIcebreakers(conv.icebreakers || []);
+  });
 }
 
 /* ══════════════════════════════════════════════════
@@ -904,19 +963,22 @@ async function sendVoiceNote() {
     scrollToBottom();
     toast(`Voice note (${formatDuration(duration)}) sent`);
 
-    — upload via REST:
-       const formData = new FormData();
-       formData.append('audio', blob, 'voice.webm');
-       formData.append('duration_s', duration);
-       const res = await fetch(`${API}/api/chat/${currentMatch.matchId}/voice`, {
-         method: 'POST',
-         headers: { 'Authorization': `Bearer ${TOKEN}` },
-         body: formData
-       });
-       const { message } = await res.json();
-       const idx = messages.findIndex(m => m.id === voiceMsg.id);
-       if (idx >= 0) messages[idx] = { ...message, sending: false };
-       renderMessages(false);
+    // Voice upload (REST)
+    try {
+      const formData = new FormData();
+      formData.append('audio', blob, 'voice.webm');
+      formData.append('duration_s', duration);
+      const res = await fetch(`${API}/api/chat/${currentMatch.matchId}/voice`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${TOKEN}` },
+        body: formData
+      });
+      if (res.ok) {
+        const { message } = await res.json();
+        const idx = messages.findIndex(m => m.id === voiceMsg.id);
+        if (idx >= 0) { messages[idx] = { ...message, sending: false }; renderMessages(false); }
+      }
+    } catch (e) { /* fallback to optimistic */ }
     setTimeout(() => {
       const idx = messages.findIndex(m => m.id === voiceMsg.id);
       if (idx >= 0) { messages[idx].sending = false; renderMessages(false); }
