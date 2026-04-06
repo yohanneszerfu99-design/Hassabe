@@ -105,13 +105,11 @@ function initChatServer(httpServer) {
                  m.user_a_id, m.user_b_id,
                  m.messaging_unlocked_at,
                  p.first_name AS partner_name,
-                 array_agg(mi.url ORDER BY mi.position LIMIT 1)
-                   FILTER (WHERE mi.id IS NOT NULL) AS partner_photos
+                 ARRAY[]::text[] AS partner_photos
           FROM matches m
           JOIN profiles p ON p.user_id = (
             CASE WHEN m.user_a_id = $2 THEN m.user_b_id ELSE m.user_a_id END
           )
-          LEFT JOIN profile_photos mi ON mi.profile_id = p.id
           WHERE m.id = $1
             AND (m.user_a_id = $2 OR m.user_b_id = $2)
           GROUP BY m.id, p.id
