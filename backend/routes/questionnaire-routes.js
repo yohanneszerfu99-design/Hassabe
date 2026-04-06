@@ -10,7 +10,7 @@
 //   POST /api/questionnaire/round2/:matchId — submit R2 answers
 //   GET  /api/questionnaire/questions      — get question list (for mobile clients)
 //
-//  AI Pipeline (triggered on Round 1 submit):
+//  AI Pipeline (triggered on Round 1 submit ):
 //   1. Validate & store structured responses in PostgreSQL
 //   2. Build a rich text narrative from responses
 //   3. Send to OpenAI text-embedding-3-large (1536 dimensions)
