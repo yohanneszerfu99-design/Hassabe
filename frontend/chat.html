@@ -10,10 +10,10 @@
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antialiased;background:#FDF8F0;overflow:hidden}
+html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antialiased;background:#FDF8F0;overflow:hidden}html{height:-webkit-fill-available}
 
 /* ── SHELL ── */
-.shell{display:flex;height:100vh;overflow:hidden}
+.shell{display:flex;height:100vh;height:100dvh;overflow:hidden}
 
 /* ══ CONVERSATION LIST (left sidebar) ══ */
 .conv-list{
@@ -319,7 +319,17 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
 @media(max-width:700px){
   .conv-list{display:none}
   .bubble{max-width:calc(100vw - 90px)}
-  .input-area{padding:10px 12px 14px}
+  .input-area{
+    padding:10px 12px 14px;
+    padding-bottom:max(14px, env(safe-area-inset-bottom));
+    position:sticky;
+    bottom:0;
+    z-index:20;
+  }
+  .chat-panel{
+    height:100dvh;
+    height:100vh;
+  }
 }
 </style>
 </head>
@@ -562,8 +572,6 @@ async function loadConversations() {
     const data = await res.json();
     const unlocked = (data.matches || []).filter(m => m.status === 'messaging_unlocked');
     renderConversationList(unlocked);
-
-    // Auto-open match from URL param
     const urlMatchId = new URLSearchParams(window.location.search).get('matchId');
     if (urlMatchId) {
       const target = unlocked.find(m => m.id === urlMatchId);
@@ -572,7 +580,6 @@ async function loadConversations() {
       setTimeout(() => openConversation(matchToConv(unlocked[0])), 300);
     }
   } catch (e) {
-    console.error('Failed to load conversations:', e);
     document.getElementById('conv-count').textContent = 'Failed to load';
   }
 }
@@ -596,12 +603,10 @@ function renderConversationList(convs) {
   const items = document.getElementById('conv-items');
   const count = document.getElementById('conv-count');
   count.textContent = `${convs.length} active conversation${convs.length !== 1 ? 's' : ''}`;
-
   if (!convs.length) {
     items.innerHTML = '<div style="padding:24px 18px;font-size:13px;color:#B5A88C">No active conversations yet.</div>';
     return;
   }
-
   items.innerHTML = convs.map(c => `
     <div class="conv-item" id="citem-${c.matchId}" onclick="openConversation(${JSON.stringify(c).replace(/"/g,'&quot;')})">
       <div class="conv-av">
@@ -645,10 +650,7 @@ function openConversation(conv) {
   showLoading();
   hideTyping();
 
-  // Join socket room
   joinRoom(conv.matchId);
-
-  // Load message history via REST
   fetch(`${API}/api/chat/${conv.matchId}/messages`, {
     headers: { 'Authorization': `Bearer ${TOKEN}` }
   })
@@ -674,11 +676,7 @@ function openConversation(conv) {
     scrollToBottom(false);
     markReadViaSocket(conv.matchId);
   })
-  .catch(() => {
-    messages = [];
-    hideLoading();
-    if (!isIbDismissed) showIcebreakers(conv.icebreakers || []);
-  });
+  .catch(() => { messages = []; hideLoading(); });
 }
 
 /* ══════════════════════════════════════════════════
@@ -963,7 +961,6 @@ async function sendVoiceNote() {
     scrollToBottom();
     toast(`Voice note (${formatDuration(duration)}) sent`);
 
-    // Voice upload (REST)
     try {
       const formData = new FormData();
       formData.append('audio', blob, 'voice.webm');
@@ -978,7 +975,7 @@ async function sendVoiceNote() {
         const idx = messages.findIndex(m => m.id === voiceMsg.id);
         if (idx >= 0) { messages[idx] = { ...message, sending: false }; renderMessages(false); }
       }
-    } catch (e) { /* fallback to optimistic */ }
+    } catch(e) {}
     setTimeout(() => {
       const idx = messages.findIndex(m => m.id === voiceMsg.id);
       if (idx >= 0) { messages[idx].sending = false; renderMessages(false); }
