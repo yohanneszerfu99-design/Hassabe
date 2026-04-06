@@ -290,8 +290,7 @@ router.get('/:matchId/status',
           p.first_name AS partner_name,
           p.city AS partner_city,
           p.profession AS partner_profession,
-          (SELECT url FROM profile_photos ph WHERE ph.profile_id = p.id
-             ORDER BY ph.position LIMIT 1) AS partner_photo
+          NULL AS partner_photo
         FROM matches m
         JOIN profiles p ON p.user_id = (
           CASE WHEN m.user_a_id = $2 THEN m.user_b_id ELSE m.user_a_id END
