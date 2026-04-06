@@ -320,7 +320,7 @@ function initChatServer(httpServer) {
       }
     });
 
-    // ── voice_note_chunk  (streaming upload) ─────────────────
+    // ── voice_note_chunk   (streaming upload) ─────────────────
     const voiceBuffers = new Map(); // socketId → chunks[]
     socket.on('voice_note_chunk', ({ matchId, chunk, chunkIndex, totalChunks }) => {
       if (!voiceBuffers.has(socket.id)) voiceBuffers.set(socket.id, []);
