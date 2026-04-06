@@ -446,8 +446,18 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
    CONFIG
    ══════════════════════════════════════════════════ */
 const API      = window.HASSABE_CONFIG.API;
-const MY_ID    = localStorage.getItem('hassabe_user_id') || 'user-me';
-const TOKEN    = localStorage.getItem('hassabe_token')   || 'demo-token';
+const TOKEN    = localStorage.getItem('hassabe_token') || '';
+
+// Decode user ID from JWT payload (middle segment)
+function getUserIdFromToken(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub || payload.id || payload.userId || null;
+  } catch { return null; }
+}
+const MY_ID = localStorage.getItem('hassabe_user_id')
+           || getUserIdFromToken(TOKEN)
+           || 'user-me';
 
 /* ══════════════════════════════════════════════════
    MOCK DATA (replace with API calls in production)
@@ -533,7 +543,15 @@ function bindSocketEvents() {
     hideLoading();
   });
   socket.on('new_message', (msg) => {
-    messages.push(msg);
+    // Replace optimistic message if clientMsgId matches, otherwise append
+    const idx = msg.clientMsgId
+      ? messages.findIndex(m => m.clientMsgId === msg.clientMsgId)
+      : -1;
+    if (idx >= 0) {
+      messages[idx] = { ...msg, sending: false };
+    } else {
+      messages.push({ ...msg, sending: false });
+    }
     renderMessages();
     scrollToBottom();
     if (msg.senderId !== MY_ID) markReadViaSocket(currentMatch?.matchId);
@@ -813,11 +831,7 @@ function sendMessage(content, type = 'text') {
     clientMsgId,
   });
 
-  // Mark as sent after brief delay (demo)
-  setTimeout(() => {
-    const idx = messages.findIndex(m => m.clientMsgId === clientMsgId);
-    if (idx >= 0) { messages[idx].sending = false; renderMessages(false); }
-  }, 600);
+  // Sending state cleared when server echoes back via new_message
 }
 
 /* ══════════════════════════════════════════════════
