@@ -142,7 +142,7 @@ async function sendReceiptEmail({ email, firstName, partnerName, amount, currenc
     </p>`;
 
   await resend.emails.send({
-    from,
+    from: FROM,
     to:      email,
     subject: `✓ Receipt — Hassabe conversation unlock ($${(amount / 100).toFixed(2)})`,
     html:    shell('Hassabe Payment Receipt', body),
@@ -185,7 +185,7 @@ async function sendRefundEmail({ email, firstName, amount, currency, refundId, r
     </p>`;
 
   await resend.emails.send({
-    from,
+    from: FROM,
     to:      email,
     subject: `Refund processed — ${amountFormatted}`,
     html:    shell('Hassabe Refund Confirmation', body),
@@ -223,7 +223,7 @@ async function sendGoldWelcomeEmail({ email, firstName, plan }) {
     ${ctaButton('Go to My Dashboard →', `${BASE}/dashboard`)}`;
 
   await resend.emails.send({
-    from,
+    from: FROM,
     to:      email,
     subject: '✦ Welcome to Hassabe Gold',
     html:    shell('Hassabe Gold — Welcome', body),
@@ -257,7 +257,7 @@ async function sendGoldCancelledEmail({ email, firstName, cancelAt }) {
     </p>`;
 
   await resend.emails.send({
-    from,
+    from: FROM,
     to:      email,
     subject: 'Your Hassabe Gold membership is being cancelled',
     html:    shell('Hassabe Gold — Cancellation', body),
