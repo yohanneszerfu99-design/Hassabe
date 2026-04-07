@@ -653,12 +653,11 @@ router.get('/:matchId/result',
           m.icebreakers, m.messaging_unlocked_at, m.expires_at,
           p.first_name, p.date_of_birth, p.profession, p.city,
           p.religion, p.practice_level, p.relationship_goal,
-          array_agg(ph.url ORDER BY ph.position) FILTER (WHERE ph.id IS NOT NULL) AS photos
+          ARRAY[]::text[] AS photos
         FROM matches m
         JOIN profiles p ON p.user_id = (
           CASE WHEN m.user_a_id = $2 THEN m.user_b_id ELSE m.user_a_id END
         )
-        LEFT JOIN profile_photos ph ON ph.profile_id = p.id
         WHERE m.id = $1 AND (m.user_a_id = $2 OR m.user_b_id = $2)
         GROUP BY m.id, p.id
       `, [req.params.matchId, req.user.id]);
