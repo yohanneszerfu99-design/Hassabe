@@ -249,7 +249,7 @@ async function renderCheckout(mId) {
       const m = data.match || data;
       match = {
         id:              mId,
-        score:           Math.round((m.score || m.r1_score || 0) * 100) || 0,
+        score:           Math.round(m.score || m.r1_score || 0) || 0,
         partnerName:     m.person?.firstName || 'Your Match',
         partnerInitials: (m.person?.firstName || 'M')[0].toUpperCase(),
         partnerSub:      [m.person?.age, m.person?.profession, m.person?.city].filter(Boolean).join(' · '),
@@ -365,7 +365,7 @@ async function renderSuccess(data = {}) {
       if (res.ok) {
         const { payment, match: m } = await res.json();
         if (m?.person?.firstName) partnerName = m.person.firstName;
-        if (m?.score)             score       = Math.round(m.score * 100);
+        if (m?.score)             score       = Math.round(m.score);
       }
     } catch (e) { /* use defaults */ }
   }
