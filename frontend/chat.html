@@ -502,6 +502,8 @@ let audioChunks    = [];
 let recordingTimer = null;
 let recordingSeconds = 0;
 let isIbDismissed  = false;
+let pollingInterval = null;
+let socketConnected = false;
 
 /* ══════════════════════════════════════════════════
    INIT
@@ -524,16 +526,22 @@ function connectSocket() {
 
 function bindSocketEvents() {
   socket.on('connect', () => {
+    socketConnected = true;
     document.getElementById('conn-status').className = 'conn-status connected';
     if (currentMatch) joinRoom(currentMatch.matchId);
+    stopPolling(); // socket is live, stop polling
   });
   socket.on('disconnect', () => {
+    socketConnected = false;
     document.getElementById('conn-status').className = 'conn-status disconnected';
     document.getElementById('conn-status').textContent = 'Disconnected — reconnecting…';
+    if (currentMatch) startPolling(currentMatch.matchId); // fallback to polling
   });
   socket.on('connect_error', () => {
+    socketConnected = false;
     document.getElementById('conn-status').className = 'conn-status reconnecting';
     document.getElementById('conn-status').textContent = 'Reconnecting…';
+    if (currentMatch) startPolling(currentMatch.matchId); // fallback to polling
   });
   socket.on('joined', (data) => {
     messages = data.messages || [];
@@ -669,6 +677,9 @@ function openConversation(conv) {
   hideTyping();
 
   joinRoom(conv.matchId);
+  // Start polling as safety net — stops automatically if socket connects
+  stopPolling();
+  if (!socketConnected) startPolling(conv.matchId);
   fetch(`${API}/api/chat/${conv.matchId}/messages`, {
     headers: { 'Authorization': `Bearer ${TOKEN}` }
   })
@@ -1127,6 +1138,50 @@ function createMockSocket() {
     disconnect: () => {},
   };
   return mock;
+}
+
+/* ══ POLLING FALLBACK (when socket disconnected) ══ */
+let lastMessageId = null;
+
+function startPolling(matchId) {
+  if (pollingInterval) return; // already polling
+  console.log('[Poll] Starting message polling fallback');
+  pollingInterval = setInterval(() => pollMessages(matchId), 3000);
+}
+
+function stopPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+    console.log('[Poll] Stopped polling (socket connected)');
+  }
+}
+
+async function pollMessages(matchId) {
+  if (!matchId || !TOKEN) return;
+  try {
+    const res  = await fetch(`${API}/api/chat/${matchId}/messages`, {
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const fresh = (data.messages || []).map(m => ({
+      id:       m.id,
+      senderId: m.sender_id || m.senderId,
+      content:  m.content,
+      type:     m.type || 'text',
+      sentAt:   m.sent_at || m.sentAt || m.created_at,
+      readAt:   m.read_at || m.readAt || null,
+      sending:  false,
+    }));
+
+    // Only update if there are new messages
+    if (fresh.length > messages.length) {
+      messages = fresh;
+      renderMessages();
+      scrollToBottom();
+    }
+  } catch (e) { /* ignore poll errors */ }
 }
 
 let toastT;
