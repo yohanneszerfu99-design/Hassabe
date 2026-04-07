@@ -308,26 +308,17 @@ async function runFinalScoring(matchId, triggeredBy = 'auto') {
     }
   }
 
-  // 8. Update match record
+  // 8. Update match record — scores and status
   await pool.query(`
     UPDATE matches SET
-      r2_score               = $1,
-      combined_score         = $2,
-      status                 = $3,
-      ${summaryData ? `
-        compatibility_summary  = $9,
-        shared_values          = $10,
-        icebreakers            = $11,
-        friction_points        = $12,
-      ` : ''}
-      updated_at             = now()
+      r2_score       = $1,
+      combined_score = $2,
+      status         = $3,
+      updated_at     = now()
     WHERE id = $4
-  `, [
-    r2Score, combined, status, matchId,
-    ...(summaryData ? [] : []),
-  ]);
+  `, [r2Score, combined, status, matchId]);
 
-  // Update with summary separately to avoid param numbering complexity
+  // Update summary separately if generated
   if (summaryData) {
     await pool.query(`
       UPDATE matches SET
@@ -338,10 +329,10 @@ async function runFinalScoring(matchId, triggeredBy = 'auto') {
         updated_at            = now()
       WHERE id = $5
     `, [
-      summaryData.summary,
-      summaryData.shared_values,
-      summaryData.icebreakers,
-      summaryData.friction_points,
+      summaryData.summary        || null,
+      JSON.stringify(summaryData.shared_values  || []),
+      JSON.stringify(summaryData.icebreakers    || []),
+      JSON.stringify(summaryData.friction_points|| []),
       matchId,
     ]);
   }
