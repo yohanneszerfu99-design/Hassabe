@@ -529,7 +529,7 @@ function bindSocketEvents() {
     socketConnected = true;
     document.getElementById('conn-status').className = 'conn-status connected';
     if (currentMatch) joinRoom(currentMatch.matchId);
-    stopPolling(); // socket is live, stop polling
+    // Don't stop polling yet — wait for 'joined' confirmation
   });
   socket.on('disconnect', () => {
     socketConnected = false;
@@ -544,6 +544,7 @@ function bindSocketEvents() {
     if (currentMatch) startPolling(currentMatch.matchId); // fallback to polling
   });
   socket.on('joined', (data) => {
+    stopPolling(); // socket room join succeeded — no need to poll
     messages = data.messages || [];
     renderMessages();
     renderExpiryBar(data.expiresAt, data.daysLeft);
@@ -677,9 +678,9 @@ function openConversation(conv) {
   hideTyping();
 
   joinRoom(conv.matchId);
-  // Start polling as safety net — stops automatically if socket connects
+  // Always poll — stops only if socket join succeeds
   stopPolling();
-  if (!socketConnected) startPolling(conv.matchId);
+  startPolling(conv.matchId);
   fetch(`${API}/api/chat/${conv.matchId}/messages`, {
     headers: { 'Authorization': `Bearer ${TOKEN}` }
   })
