@@ -1,731 +1,680 @@
-// ═══════════════════════════════════════════════════════════════
-//  HASSABE — Round 2 & Final Scoring Routes  (Step 7)
-//  File: round2-routes.js
-//
-//  Routes:
-//   POST /api/round2/:matchId          — submit R2 answers + trigger final scoring
-//   GET  /api/round2/:matchId/status   — R2 completion status for both users
-//   POST /api/round2/:matchId/draft    — save R2 draft
-//   GET  /api/round2/:matchId/draft    — restore R2 draft
-//   GET  /api/round2/:matchId/result   — get final result after scoring
-//   POST /api/round2/admin/rescore/:matchId — admin: re-run final scoring
-//
-//  Final Scoring Pipeline (triggered when both users submit R2):
-//   1. Fetch both users' R1 and R2 embeddings from PostgreSQL
-//   2. Compute R2 cosine similarity via pgvector
-//   3. Compute weighted R2 dimension score
-//   4. Combined = R1 × 0.40 + R2 × 0.60
-//   5. If combined ≥ 68 → approve, else → decline
-//   6. Generate updated GPT-4o summary if approved
-//   7. Update match record with final status
-//   8. Send notifications to both users (Step 6)
-//   9. Return result to requesting user
-// ═══════════════════════════════════════════════════════════════
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="/js/config.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hassabe — Round 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antialiased;background:#FAF6EE;color:#2A1C06}
 
-require('dotenv').config();
+.page{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:0 0 80px}
 
-const express  = require('express');
-const { Pool } = require('pg');
-const OpenAI   = require('openai');
-const jwt      = require('jsonwebtoken');
-const { body, param, validationResult } = require('express-validator');
-const rateLimit = require('express-rate-limit');
+/* ── TOP BAR ── */
+.topbar{width:100%;background:#0C0902;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-logo{font-family:'Cormorant Garamond',serif;font-size:20px;color:#FAF0DC;text-decoration:none}
+.topbar-logo span{color:#C9A84C}
+.topbar-back{font-size:12px;color:rgba(232,213,163,.4);background:none;border:none;cursor:pointer;font-family:'Jost',sans-serif;transition:color .2s}
+.topbar-back:hover{color:rgba(232,213,163,.8)}
 
-const { notify, notifyPair } = require('../notification-service');
-const { generateMatchSummary, computeWeightedScore, CONFIG } = require('../matching-engine');
+/* ── PROGRESS ── */
+.progress-wrap{width:100%;max-width:600px;padding:24px 24px 0}
+.progress-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.progress-label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9A8A72}
+.progress-count{font-size:12px;color:#9A8A72}
+.progress-bar{height:3px;background:rgba(139,105,20,.12);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#C9A84C,#E8D5A3);border-radius:2px;transition:width .4s ease}
 
-const router = express.Router();
-const pool   = new Pool({ connectionString: process.env.DATABASE_URL });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+/* ── MATCH BANNER ── */
+.match-banner{width:100%;max-width:600px;padding:16px 24px 0}
+.match-card{background:#fff;border:.5px solid rgba(139,105,20,.15);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.match-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,rgba(201,168,76,.25),rgba(201,168,76,.06));border:1.5px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:#C9A84C;flex-shrink:0}
+.match-info{flex:1}
+.match-name{font-size:13px;font-weight:500;color:#2A1C06}
+.match-sub{font-size:11px;color:#9A8A72;margin-top:1px}
+.match-score{font-family:'Cormorant Garamond',serif;font-size:20px;color:#C9A84C;font-weight:500}
+.match-score-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:rgba(201,168,76,.4);text-align:right}
 
-// ── Auth middleware ──
-async function requireAuth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authorization required' });
-  try {
-    const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET, {
-      issuer: 'hassabe.com', audience: 'hassabe-api',
-    });
-    const result = await pool.query(
-      'SELECT id, name, email, status FROM users WHERE id = $1', [payload.sub]
-    );
-    if (!result.rows[0] || result.rows[0].status !== 'active') {
-      return res.status(401).json({ error: 'Account not found' });
-    }
-    req.user = result.rows[0];
-    next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
+/* ── DIMENSION LABEL ── */
+.dim-wrap{width:100%;max-width:600px;padding:20px 24px 0}
+.dim-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.1);border:.5px solid rgba(201,168,76,.25);border-radius:20px;padding:5px 12px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8B6914}
+
+/* ── QUESTION CARD ── */
+.q-wrap{width:100%;max-width:600px;padding:16px 24px 0}
+.q-card{background:#fff;border:.5px solid rgba(139,105,20,.15);border-radius:12px;padding:28px 24px}
+.q-number{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#B5A88C;margin-bottom:10px}
+.q-text{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:#2A1C06;line-height:1.4;margin-bottom:24px}
+
+/* Scale */
+.scale-wrap{display:flex;flex-direction:column;gap:10px}
+.scale-labels{display:flex;justify-content:space-between;font-size:10px;color:#B5A88C;padding:0 2px}
+.scale-options{display:flex;gap:8px}
+.scale-btn{flex:1;padding:14px 8px;border:.5px solid rgba(139,105,20,.2);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;font-weight:400;color:#5A4A2E;transition:all .18s;text-align:center;font-family:'Jost',sans-serif}
+.scale-btn:hover{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.05)}
+.scale-btn.selected{background:#2A1C06;color:#E8D5A3;border-color:#2A1C06}
+
+/* Single choice */
+.single-options{display:flex;flex-direction:column;gap:8px}
+.single-btn{width:100%;padding:13px 16px;border:.5px solid rgba(139,105,20,.2);border-radius:6px;background:#fff;cursor:pointer;font-size:13px;color:#2A1C06;text-align:left;transition:all .18s;font-family:'Jost',sans-serif;display:flex;align-items:center;gap:10px}
+.single-btn:hover{border-color:rgba(201,168,76,.5);background:rgba(201,168,76,.05)}
+.single-btn.selected{background:#2A1C06;color:#E8D5A3;border-color:#2A1C06}
+.single-btn .radio{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(139,105,20,.3);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.single-btn.selected .radio{border-color:#C9A84C;background:#C9A84C}
+.single-btn.selected .radio::after{content:'';width:6px;height:6px;border-radius:50%;background:#0C0902}
+
+/* Text */
+.text-input{width:100%;border:.5px solid rgba(139,105,20,.2);border-radius:6px;padding:14px 16px;font-family:'Jost',sans-serif;font-size:14px;font-weight:300;color:#2A1C06;background:#fff;resize:none;outline:none;line-height:1.6;min-height:120px;transition:border-color .2s}
+.text-input:focus{border-color:rgba(201,168,76,.5)}
+.text-input::placeholder{color:#C0B09A}
+.char-count{font-size:11px;color:#B5A88C;text-align:right;margin-top:6px}
+
+/* Skip */
+.skip-btn{display:block;margin-top:14px;font-size:12px;color:#B5A88C;background:none;border:none;cursor:pointer;font-family:'Jost',sans-serif;width:100%;text-align:center;transition:color .2s}
+.skip-btn:hover{color:#9A8A72}
+
+/* ── NAV ── */
+.nav-wrap{width:100%;max-width:600px;padding:20px 24px 0;display:flex;align-items:center;gap:12px}
+.btn-prev{flex:0 0 auto;padding:14px 20px;border:.5px solid rgba(139,105,20,.2);border-radius:4px;background:#fff;font-size:13px;color:#5A4A2E;cursor:pointer;font-family:'Jost',sans-serif;transition:all .2s}
+.btn-prev:hover{background:rgba(201,168,76,.06)}
+.btn-next{flex:1;padding:15px 24px;background:#2A1C06;color:#E8D5A3;border:none;border-radius:4px;font-size:13px;font-weight:500;letter-spacing:.04em;cursor:pointer;font-family:'Jost',sans-serif;transition:background .2s}
+.btn-next:hover{background:#1A1005}
+.btn-next:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── SCREENS ── */
+.screen{display:none;width:100%;max-width:600px;padding:40px 24px;text-align:center}
+.screen.active{display:block}
+
+/* Intro screen */
+.intro-icon{font-size:48px;margin-bottom:20px}
+.intro-h{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:400;color:#2A1C06;margin-bottom:12px;line-height:1.2}
+.intro-h em{font-style:italic;color:#C9A84C}
+.intro-p{font-size:14px;color:#5A4A2E;line-height:1.75;margin-bottom:8px}
+.intro-dims{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:20px 0 28px}
+.intro-dim{background:rgba(201,168,76,.08);border:.5px solid rgba(201,168,76,.2);border-radius:20px;padding:5px 12px;font-size:11px;color:#8B6914;letter-spacing:.08em}
+.btn-start{width:100%;padding:16px;background:#C9A84C;color:#0C0902;border:none;border-radius:4px;font-size:14px;font-weight:500;letter-spacing:.04em;cursor:pointer;font-family:'Jost',sans-serif;margin-bottom:10px;transition:background .2s}
+.btn-start:hover{background:#E8D5A3}
+
+/* Waiting screen */
+.waiting-icon{font-size:48px;margin-bottom:20px}
+.waiting-h{font-family:'Cormorant Garamond',serif;font-size:28px;color:#2A1C06;margin-bottom:10px}
+.waiting-p{font-size:14px;color:#5A4A2E;line-height:1.75;margin-bottom:24px}
+.waiting-status{background:#fff;border:.5px solid rgba(139,105,20,.15);border-radius:8px;padding:16px 20px;margin-bottom:24px}
+.status-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:13px}
+.status-row:not(:last-child){border-bottom:.5px solid rgba(139,105,20,.08)}
+.status-name{color:#5A4A2E}
+.status-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-done{background:rgba(39,174,96,.1);color:#1e8a50}
+.badge-pending{background:rgba(201,168,76,.1);color:#8B6914}
+
+/* Result screen */
+.result-icon{font-size:52px;margin-bottom:16px}
+.result-h{font-family:'Cormorant Garamond',serif;font-size:32px;color:#2A1C06;margin-bottom:8px;line-height:1.2}
+.result-h em{font-style:italic;color:#C9A84C}
+.result-p{font-size:14px;color:#5A4A2E;line-height:1.75;margin-bottom:24px}
+.score-display{background:#fff;border:.5px solid rgba(139,105,20,.15);border-radius:8px;padding:20px;margin-bottom:20px}
+.score-big{font-family:'Cormorant Garamond',serif;font-size:56px;color:#C9A84C;line-height:1}
+.score-lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#B5A88C;margin-top:4px}
+.btn-unlock{width:100%;padding:16px;background:#C9A84C;color:#0C0902;border:none;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer;font-family:'Jost',sans-serif;margin-bottom:10px;transition:background .2s}
+.btn-unlock:hover{background:#E8D5A3}
+.btn-matches{width:100%;padding:14px;background:transparent;color:#5A4A2E;border:.5px solid rgba(139,105,20,.2);border-radius:4px;font-size:13px;cursor:pointer;font-family:'Jost',sans-serif;transition:all .2s}
+.btn-matches:hover{background:rgba(201,168,76,.06)}
+
+/* Declined screen */
+.declined-p{font-size:14px;color:#5A4A2E;line-height:1.75;margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(14px);background:#2A1C06;color:#E8D5A3;padding:10px 20px;border-radius:3px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;border:.5px solid rgba(201,168,76,.2)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:480px){
+  .q-text{font-size:19px}
+  .scale-btn{padding:12px 4px;font-size:12px}
 }
+</style>
+</head>
+<body>
+<div class="page" id="page">
 
-async function requireAdmin(req, res, next) {
-  await requireAuth(req, res, async () => {
-    const r = await pool.query('SELECT is_admin FROM users WHERE id = $1', [req.user.id]);
-    if (!r.rows[0]?.is_admin) return res.status(403).json({ error: 'Admin required' });
-    next();
-  });
-}
+  <!-- Top bar -->
+  <div class="topbar">
+    <a class="topbar-logo" href="/matches.html">✦ <span>Hassabe</span></a>
+    <button class="topbar-back" onclick="window.location.href='/matches.html'">← Back to matches</button>
+  </div>
 
-function checkValidation(req, res) {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
-  return null;
-}
+  <!-- INTRO SCREEN -->
+  <div class="screen active" id="screen-intro">
+    <div class="intro-icon">✦</div>
+    <h1 class="intro-h">Round 2 —<br><em>The Deeper Look</em></h1>
+    <p class="intro-p">You and your match passed Round 1. Now it's time to go deeper.</p>
+    <p class="intro-p" style="color:#9A8A72;font-size:13px">These questions explore the things that actually make or break a marriage. Answer honestly — there are no right answers.</p>
+    <div class="intro-dims">
+      <span class="intro-dim">Marriage</span>
+      <span class="intro-dim">Finances</span>
+      <span class="intro-dim">Family</span>
+      <span class="intro-dim">Conflict</span>
+      <span class="intro-dim">Readiness</span>
+    </div>
+    <div id="match-banner-intro" style="margin-bottom:24px"></div>
+    <button class="btn-start" onclick="startQuestionnaire()">Begin Round 2 →</button>
+    <p style="font-size:12px;color:#B5A88C">~10 minutes · Both partners must complete</p>
+  </div>
 
-const r2Limiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: { error: 'Too many submissions.' } });
+  <!-- QUESTIONNAIRE SCREEN -->
+  <div class="screen" id="screen-q">
+    <!-- Progress -->
+    <div class="progress-wrap" style="padding-top:20px">
+      <div class="progress-top">
+        <span class="progress-label">Round 2</span>
+        <span class="progress-count" id="q-count">1 / 21</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:5%"></div></div>
+    </div>
 
-// ══════════════════════════════════════════════════════════════
-//  R2 DIMENSION WEIGHTS (heavier than R1 — deeper signals)
-// ══════════════════════════════════════════════════════════════
-const R2_WEIGHTS = {
-  marriage:  0.25,   // timeline, expectations, tradition
-  finances:  0.15,   // structure, attitudes, obligations
-  family:    0.20,   // roles, involvement, parenting
-  conflict:  0.20,   // emotional maturity, vulnerability
-  readiness: 0.20,   // availability, honesty, commitment concept
+    <!-- Dimension label -->
+    <div class="dim-wrap">
+      <div class="dim-pill" id="dim-pill">Marriage</div>
+    </div>
+
+    <!-- Question card -->
+    <div class="q-wrap">
+      <div class="q-card">
+        <div class="q-number" id="q-number">Question 1</div>
+        <div class="q-text" id="q-text">Loading…</div>
+        <div id="q-input"></div>
+        <button class="skip-btn" id="skip-btn" onclick="skipQuestion()">Skip this question</button>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-wrap">
+      <button class="btn-prev" id="btn-prev" onclick="prevQuestion()">← Back</button>
+      <button class="btn-next" id="btn-next" onclick="nextQuestion()" disabled>Continue →</button>
+    </div>
+  </div>
+
+  <!-- WAITING SCREEN -->
+  <div class="screen" id="screen-waiting">
+    <div class="waiting-icon">⏳</div>
+    <h2 class="waiting-h">You're done — waiting for your match</h2>
+    <p class="waiting-p">Your Round 2 responses have been saved. We'll notify you as soon as your match completes theirs.</p>
+    <div class="waiting-status" id="waiting-status"></div>
+    <button class="btn-matches" onclick="window.location.href='/matches.html'">Back to matches</button>
+  </div>
+
+  <!-- RESULT APPROVED SCREEN -->
+  <div class="screen" id="screen-approved">
+    <div class="result-icon">💛</div>
+    <h1 class="result-h">You're a<br><em>strong match</em></h1>
+    <p class="result-p" id="approved-p">Your combined compatibility score puts you in the top tier. Unlock your conversation to begin.</p>
+    <div class="score-display">
+      <div class="score-big" id="combined-score">—</div>
+      <div class="score-lbl">Combined Score</div>
+    </div>
+    <button class="btn-unlock" id="btn-unlock" onclick="goToPayment()">Unlock Conversation — $49.99 →</button>
+    <button class="btn-matches" onclick="window.location.href='/matches.html'">Back to matches</button>
+  </div>
+
+  <!-- RESULT DECLINED SCREEN -->
+  <div class="screen" id="screen-declined">
+    <div class="result-icon" style="opacity:.5">—</div>
+    <h1 class="result-h" style="color:#5A4A2E">Not the right fit<br>this time</h1>
+    <p class="declined-p">Your combined score didn't reach the threshold for a strong match. This is rare and reflects deep value differences, not anything wrong with either of you.</p>
+    <button class="btn-matches" onclick="window.location.href='/matches.html'">Back to matches</button>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+const API   = window.HASSABE_CONFIG.API;
+const TOKEN = localStorage.getItem('hassabe_token') || '';
+const params  = new URLSearchParams(window.location.search);
+const MATCH_ID = params.get('matchId');
+
+if (!TOKEN || !MATCH_ID) window.location.href = '/matches.html';
+
+/* ══════════════════════════════════════════════════
+   QUESTIONS
+══════════════════════════════════════════════════ */
+const QUESTIONS = [
+  // ── MARRIAGE (5) ──
+  { id:'m1', dim:'marriage', type:'single', sensitive:false,
+    text:'When do you see yourself getting married?',
+    options:['Within the next year','In 1–2 years','In 2–3 years','In 3–5 years','I\'m not sure yet'] },
+  { id:'m2', dim:'marriage', type:'scale5', sensitive:false,
+    text:'How traditional do you want your marriage to be?',
+    low:'Very modern', high:'Very traditional' },
+  { id:'m3', dim:'marriage', type:'scale5', sensitive:false,
+    text:'How important is family approval before getting married?',
+    low:'Not important', high:'Essential' },
+  { id:'m4', dim:'marriage', type:'single', sensitive:false,
+    text:'How important is a formal engagement period before marriage?',
+    options:['Not important at all','Somewhat important','Very important','Required by family/culture','Open to discussing'] },
+  { id:'m5', dim:'marriage', type:'text', sensitive:false,
+    text:'In your own words — what do you hope marriage feels like on an ordinary Tuesday?' },
+
+  // ── FINANCES (4) ──
+  { id:'f1', dim:'finances', type:'single', sensitive:true,
+    text:'How would you prefer to handle finances in marriage?',
+    options:['Fully joint — everything shared','Mostly joint with some personal money','Equal split — each pays half','Mostly separate with shared bills','Completely separate'] },
+  { id:'f2', dim:'finances', type:'scale5', sensitive:true,
+    text:'How do you feel about financial obligations to extended family (parents, siblings)?',
+    low:'No obligation', high:'Strong obligation' },
+  { id:'f3', dim:'finances', type:'scale5', sensitive:false,
+    text:'How important is financial stability before getting married?',
+    low:'Not a prerequisite', high:'Must be fully stable' },
+  { id:'f4', dim:'finances', type:'single', sensitive:true,
+    text:'Who should be the primary financial provider in the home?',
+    options:['The man','The woman','Whoever earns more','Equally shared','Flexible — depends on circumstances'] },
+
+  // ── FAMILY (4) ──
+  { id:'fa1', dim:'family', type:'scale5', sensitive:false,
+    text:'How involved do you expect your extended family to be in your married life?',
+    low:'Not involved', high:'Very involved' },
+  { id:'fa2', dim:'family', type:'single', sensitive:false,
+    text:'How do you feel about living near or with in-laws?',
+    options:['Prefer to live with them','Prefer to live nearby','Moderate distance is fine','Prefer to live far','No strong preference'] },
+  { id:'fa3', dim:'family', type:'single', sensitive:false,
+    text:'How do you envision dividing household responsibilities?',
+    options:['Traditional — clear gender roles','Mostly traditional','Fully equal split','Based on each person\'s strengths','Flexible and situational'] },
+  { id:'fa4', dim:'family', type:'text', sensitive:false,
+    text:'How do you envision raising children in your faith and culture?' },
+
+  // ── CONFLICT (4) ──
+  { id:'c1', dim:'conflict', type:'single', sensitive:false,
+    text:'When you\'re upset with your partner, you tend to:',
+    options:['Need space before talking','Talk it through immediately','Depends on the situation','Write it out first','Pray or reflect before engaging'] },
+  { id:'c2', dim:'conflict', type:'scale5', sensitive:false,
+    text:'How important is it to resolve conflict before going to sleep?',
+    low:'Not important', high:'Very important' },
+  { id:'c3', dim:'conflict', type:'scale5', sensitive:false,
+    text:'How comfortable are you with emotional vulnerability in a relationship?',
+    low:'Very guarded', high:'Fully open' },
+  { id:'c4', dim:'conflict', type:'text', sensitive:false,
+    text:'Describe how you typically handle conflict in a close relationship.' },
+
+  // ── READINESS (4) ──
+  { id:'r1', dim:'readiness', type:'scale5', sensitive:false,
+    text:'How ready do you feel for marriage right now?',
+    low:'Not ready', high:'Completely ready' },
+  { id:'r2', dim:'readiness', type:'single', sensitive:false,
+    text:'Are there significant life changes coming in the next 2 years?',
+    options:['Major career change','Relocating','Continuing education','Family obligations','Nothing major planned','Multiple things in motion'] },
+  { id:'r3', dim:'readiness', type:'scale5', sensitive:false,
+    text:'How emotionally available are you for a serious relationship right now?',
+    low:'Limited capacity', high:'Fully available' },
+  { id:'r4', dim:'readiness', type:'text', sensitive:false,
+    text:'What\'s the one area of yourself you\'re still working on before marriage?' },
+];
+
+const DIM_LABELS = {
+  marriage:  'Marriage',
+  finances:  'Finances',
+  family:    'Family',
+  conflict:  'Conflict',
+  readiness: 'Readiness',
 };
 
-// ══════════════════════════════════════════════════════════════
-//  EMBEDDING HELPERS
-// ══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════ */
+let currentQ   = 0;
+let answers    = {};   // question_id → { answer, answer_text, skipped }
+let matchData  = null;
 
-function buildR2Narrative(responses, profile) {
-  const byDim = {};
-  for (const r of responses) {
-    if (r.skipped || !r.answer_text) continue;
-    if (!byDim[r.dimension]) byDim[r.dimension] = [];
-    // Exclude sensitive responses from narrative text (still scored but not embedded verbatim)
-    if (!r.sensitive) byDim[r.dimension].push(r.answer_text);
-  }
+/* ══════════════════════════════════════════════════
+   INIT
+══════════════════════════════════════════════════ */
+(async function init() {
+  if (!TOKEN) return;
 
-  const sections = [];
-
-  // Profile context for richer signal
-  if (profile) {
-    sections.push(`Background: ${profile.religion || ''}, ${profile.relationship_goal || ''}, heritage ${(profile.ethnicity || []).join(', ')}.`);
-  }
-
-  const dimLabels = {
-    marriage:  'Marriage expectations and timing',
-    finances:  'Financial attitudes and structure',
-    family:    'Family roles and involvement',
-    conflict:  'Conflict and emotional life',
-    readiness: 'Readiness and life context',
-  };
-
-  for (const [dim, label] of Object.entries(dimLabels)) {
-    const answers = byDim[dim];
-    if (answers?.length) sections.push(`${label}: ${answers.join('. ')}.`);
-  }
-
-  return sections.join('\n\n');
-}
-
-async function generateEmbedding(text) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const res = await openai.embeddings.create({
-        model: 'text-embedding-3-large',
-        input: text,
-        dimensions: 1536,
-      });
-      return res.data[0].embedding;
-    } catch (err) {
-      if (attempt === 2) throw err;
-      await new Promise(r => setTimeout(r, 1000 * attempt));
-    }
-  }
-}
-
-// ══════════════════════════════════════════════════════════════
-//  R2 DIMENSION SCORER
-// ══════════════════════════════════════════════════════════════
-
-function scoreR2Dimensions(responsesA, responsesB) {
-  // Build dimension answer maps
-  function buildMap(responses) {
-    const map = {};
-    for (const r of responses) {
-      if (!r.skipped && r.answer !== null) {
-        if (!map[r.dimension]) map[r.dimension] = [];
-        map[r.dimension].push(r);
-      }
-    }
-    return map;
-  }
-
-  const mapA = buildMap(responsesA);
-  const mapB = buildMap(responsesB);
-
-  const breakdown = {};
-  let weightedTotal = 0;
-  let weightSum = 0;
-
-  for (const [dim, weight] of Object.entries(R2_WEIGHTS)) {
-    const answersA = mapA[dim] || [];
-    const answersB = mapB[dim] || [];
-
-    if (!answersA.length || !answersB.length) {
-      breakdown[dim] = 50; // neutral if either side missing
-      continue;
-    }
-
-    // Per-dimension agreement scoring
-    let dimScore = 0;
-    let matched  = 0;
-
-    for (const rA of answersA) {
-      const rB = answersB.find(r => r.question_id === rA.question_id);
-      if (!rB) continue;
-      matched++;
-
-      if (rA.type === 'scale5' && rB.type === 'scale5') {
-        // Scale proximity: 5=perfect, 4=close, etc.
-        const diff = Math.abs((rA.answer || 3) - (rB.answer || 3));
-        dimScore += Math.max(0, 100 - diff * 25);
-      } else if (rA.type === 'single' && rB.type === 'single') {
-        // Exact match = 100, adjacent options = partial credit
-        const diff = Math.abs((rA.answer || 0) - (rB.answer || 0));
-        const optCount = 5; // typical option count
-        dimScore += Math.max(0, 100 - (diff / optCount) * 80);
-      } else if (rA.type === 'multi' && rB.type === 'multi') {
-        // Jaccard similarity on selected options
-        const setA = new Set(Array.isArray(rA.answer) ? rA.answer : []);
-        const setB = new Set(Array.isArray(rB.answer) ? rB.answer : []);
-        const union = new Set([...setA, ...setB]);
-        const intersect = [...setA].filter(x => setB.has(x)).length;
-        dimScore += union.size > 0 ? (intersect / union.size) * 100 : 50;
-      } else if (rA.type === 'text') {
-        // Text answers: embedding similarity handled at the combined level
-        dimScore += 70; // conservative baseline for text
-      }
-    }
-
-    breakdown[dim] = matched > 0 ? Math.round(dimScore / matched) : 50;
-    weightedTotal += breakdown[dim] * weight;
-    weightSum += weight;
-  }
-
-  const dimScore = weightSum > 0 ? Math.round(weightedTotal / weightSum) : 50;
-  return { dimScore, breakdown };
-}
-
-// ══════════════════════════════════════════════════════════════
-//  FINAL SCORING ENGINE
-// ══════════════════════════════════════════════════════════════
-
-async function runFinalScoring(matchId, triggeredBy = 'auto') {
-  console.log(`\n[FinalScoring] Starting for match ${matchId} (triggered by: ${triggeredBy})`);
-
-  // 1. Fetch match with both users
-  const matchResult = await pool.query(`
-    SELECT m.*,
-      pa.first_name AS name_a, pa.religion AS religion_a, pa.ethnicity AS ethnicity_a,
-      pa.relationship_goal AS goal_a,
-      pb.first_name AS name_b, pb.religion AS religion_b, pb.ethnicity AS ethnicity_b,
-      pb.relationship_goal AS goal_b
-    FROM matches m
-    JOIN profiles pa ON pa.user_id = m.user_a_id
-    JOIN profiles pb ON pb.user_id = m.user_b_id
-    WHERE m.id = $1
-  `, [matchId]);
-
-  if (!matchResult.rows[0]) throw new Error('Match not found');
-  const match = matchResult.rows[0];
-
-  // Guard: only score once
-  if (['approved', 'declined', 'messaging_unlocked'].includes(match.status) && triggeredBy !== 'admin') {
-    console.log(`[FinalScoring] Match ${matchId} already scored (${match.status}), skipping`);
-    return { alreadyScored: true, status: match.status };
-  }
-
-  // 2. Fetch R1 data for both
-  const [r1A, r1B] = await Promise.all([
-    pool.query(`SELECT dimension_scores FROM questionnaire_responses WHERE user_id = $1 AND round = 1 AND status = 'complete' ORDER BY created_at DESC LIMIT 1`, [match.user_a_id]),
-    pool.query(`SELECT dimension_scores FROM questionnaire_responses WHERE user_id = $1 AND round = 1 AND status = 'complete' ORDER BY created_at DESC LIMIT 1`, [match.user_b_id]),
-  ]);
-
-  // 3. Fetch R2 responses for both
-  const [r2A, r2B] = await Promise.all([
-    pool.query(`SELECT responses, narrative_text, embedding FROM questionnaire_responses WHERE user_id = $1 AND round = 2 AND match_id = $2 AND status = 'complete'`, [match.user_a_id, matchId]),
-    pool.query(`SELECT responses, narrative_text, embedding FROM questionnaire_responses WHERE user_id = $1 AND round = 2 AND match_id = $2 AND status = 'complete'`, [match.user_b_id, matchId]),
-  ]);
-
-  if (!r2A.rows[0] || !r2B.rows[0]) {
-    throw new Error('Both users must complete Round 2 before final scoring');
-  }
-
-  const r2ResponsesA = r2A.rows[0].responses || [];
-  const r2ResponsesB = r2B.rows[0].responses || [];
-
-  // 4. R2 embedding similarity
-  let r2EmbedSimilarity = 0.7; // fallback if embeddings missing
+  // Load match status
   try {
-    const simResult = await pool.query(`
-      SELECT 1 - (
-        (SELECT embedding FROM questionnaire_responses WHERE user_id = $1 AND round = 2 AND match_id = $3)
-        <=>
-        (SELECT embedding FROM questionnaire_responses WHERE user_id = $2 AND round = 2 AND match_id = $3)
-      ) AS similarity
-    `, [match.user_a_id, match.user_b_id, matchId]);
-    r2EmbedSimilarity = parseFloat(simResult.rows[0]?.similarity || 0.7);
-  } catch (err) {
-    console.warn('[FinalScoring] Embedding similarity query failed:', err.message);
-  }
+    const res  = await fetch(`${API}/api/round2/${MATCH_ID}/status`, {
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    const data = await res.json();
 
-  // 5. R2 dimension score
-  const { dimScore: r2DimScore, breakdown: r2Breakdown } = scoreR2Dimensions(r2ResponsesA, r2ResponsesB);
+    if (!res.ok) { toast(data.error || 'Failed to load match'); return; }
 
-  // Combined R2 score: 60% embedding + 40% dimension
-  const r2Score = Math.round((r2EmbedSimilarity * 100 * 0.60) + (r2DimScore * 0.40));
+    matchData = data;
 
-  // 6. Final combined score
-  const r1Score   = parseFloat(match.r1_score || 0);
-  const combined  = Math.round((r1Score * CONFIG.R1_FINAL_WEIGHT) + (r2Score * CONFIG.R2_FINAL_WEIGHT));
-  const approved  = combined >= CONFIG.FINAL_THRESHOLD;
-  const status    = approved ? 'approved' : 'declined';
-
-  console.log(`[FinalScoring] R1=${r1Score}% R2=${r2Score}% Combined=${combined}% → ${status.toUpperCase()}`);
-
-  // 7. Generate updated GPT-4o summary if approved
-  let summaryData = null;
-  if (approved) {
-    try {
-      const profileA = { first_name: match.name_a, religion: match.religion_a, ethnicity: match.ethnicity_a, relationship_goal: match.goal_a };
-      const profileB = { first_name: match.name_b, religion: match.religion_b, ethnicity: match.ethnicity_b, relationship_goal: match.goal_b };
-      const narrativeA = r2A.rows[0].narrative_text;
-      const narrativeB = r2B.rows[0].narrative_text;
-
-      summaryData = await generateMatchSummary(
-        { userId: match.user_a_id, profile: profileA, narrative: narrativeA },
-        { userId: match.user_b_id, profile: profileB, narrative: narrativeB },
-        { score: combined, breakdown: r2Breakdown }
-      );
-      console.log('[FinalScoring] GPT-4o summary generated');
-    } catch (err) {
-      console.warn('[FinalScoring] GPT-4o summary failed:', err.message);
-    }
-  }
-
-  // 8. Update match record
-  await pool.query(`
-    UPDATE matches SET
-      r2_score               = $1,
-      combined_score         = $2,
-      status                 = $3,
-      ${summaryData ? `
-        compatibility_summary  = $9,
-        shared_values          = $10,
-        icebreakers            = $11,
-        friction_points        = $12,
-      ` : ''}
-      updated_at             = now()
-    WHERE id = $4
-  `, [
-    r2Score, combined, status, matchId,
-    ...(summaryData ? [] : []),
-  ]);
-
-  // Update with summary separately to avoid param numbering complexity
-  if (summaryData) {
-    await pool.query(`
-      UPDATE matches SET
-        compatibility_summary = $1,
-        shared_values         = $2,
-        icebreakers           = $3,
-        friction_points       = $4,
-        updated_at            = now()
-      WHERE id = $5
-    `, [
-      summaryData.summary,
-      summaryData.shared_values,
-      summaryData.icebreakers,
-      summaryData.friction_points,
-      matchId,
-    ]);
-  }
-
-  // 9. Send notifications to both users
-  const notifType = approved ? 'match_approved' : 'match_declined';
-  const notifData = {
-    matchId,
-    combinedScore: combined,
-    sharedValues: summaryData?.shared_values || [],
-  };
-
-  await notifyPair(match.user_a_id, match.user_b_id, notifType, notifData, notifData);
-
-  console.log(`[FinalScoring] Complete. Match ${matchId} → ${status}`);
-
-  return {
-    matchId,
-    r1Score,
-    r2Score,
-    combinedScore: combined,
-    status,
-    approved,
-    breakdown: r2Breakdown,
-    summaryGenerated: !!summaryData,
-  };
-}
-
-// ══════════════════════════════════════════════════════════════
-//  POST /api/round2/:matchId — Submit Round 2
-// ══════════════════════════════════════════════════════════════
-router.post('/:matchId',
-  requireAuth,
-  r2Limiter,
-  [
-    param('matchId').isUUID(),
-    body('responses').isArray({ min: 15 }).withMessage('At least 15 responses required'),
-    body('responses.*.question_id').notEmpty(),
-    body('responses.*.dimension').isIn(Object.keys(R2_WEIGHTS)),
-  ],
-  async (req, res) => {
-    const err = checkValidation(req, res);
-    if (err) return;
-
-    const { matchId } = req.params;
-    const { responses, metadata } = req.body;
-
-    try {
-      // Verify match exists and user is a participant
-      const matchResult = await pool.query(`
-        SELECT id, user_a_id, user_b_id, status,
-               r2_a_completed_at, r2_b_completed_at, r2_expires_at
-        FROM matches
-        WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $2)
-      `, [matchId, req.user.id]);
-
-      if (!matchResult.rows[0]) return res.status(404).json({ error: 'Match not found' });
-      const match = matchResult.rows[0];
-
-      if (!['notified', 'pending_r2'].includes(match.status)) {
-        return res.status(409).json({
-          error: `Match status is '${match.status}'. Round 2 is not available.`,
-        });
-      }
-
-      // Check expiry
-      if (match.r2_expires_at && new Date(match.r2_expires_at) < new Date()) {
-        return res.status(410).json({ error: 'This Round 2 window has expired.' });
-      }
-
-      const isUserA = match.user_a_id === req.user.id;
-      const alreadyDone = isUserA ? match.r2_a_completed_at : match.r2_b_completed_at;
-      if (alreadyDone) {
-        return res.status(409).json({ error: 'You have already submitted Round 2 for this match.' });
-      }
-
-      // Get profile for embedding context
-      const profileResult = await pool.query(
-        'SELECT * FROM profiles WHERE user_id = $1', [req.user.id]
-      );
-
-      // Build narrative and generate embedding
-      const narrative = buildR2Narrative(responses, profileResult.rows[0]);
-      let embedding   = null;
-      let embedModel  = null;
-      try {
-        embedding  = await generateEmbedding(narrative);
-        embedModel = 'text-embedding-3-large';
-        console.log(`[R2] Embedding generated for user ${req.user.id}`);
-      } catch (embErr) {
-        console.warn('[R2] Embedding failed, saving without:', embErr.message);
-      }
-
-      // Compute own dimension scores
-      const ownDimScores = {};
-      for (const dim of Object.keys(R2_WEIGHTS)) {
-        const dimAnswers = responses.filter(r => r.dimension === dim && !r.skipped);
-        ownDimScores[dim] = dimAnswers.length > 0 ? 75 : 50; // baseline; real score at pairing
-      }
-
-      await pool.query('BEGIN');
-
-      // Save R2 questionnaire response
-      await pool.query(`
-        INSERT INTO questionnaire_responses
-          (user_id, round, match_id, responses, narrative_text, embedding, embedding_model,
-           dimension_scores, started_at, completed_at, status)
-        VALUES ($1, 2, $2, $3, $4, $5::vector, $6, $7, $8, $9, 'complete')
-        ON CONFLICT (user_id, round, match_id)
-        DO UPDATE SET
-          responses       = EXCLUDED.responses,
-          narrative_text  = EXCLUDED.narrative_text,
-          embedding       = EXCLUDED.embedding,
-          dimension_scores= EXCLUDED.dimension_scores,
-          completed_at    = EXCLUDED.completed_at,
-          updated_at      = now()
-      `, [
-        req.user.id, matchId,
-        JSON.stringify(responses),
-        narrative,
-        embedding ? `[${embedding.join(',')}]` : null,
-        embedModel,
-        JSON.stringify(ownDimScores),
-        metadata?.started_at || new Date().toISOString(),
-        metadata?.completed_at || new Date().toISOString(),
-      ]);
-
-      // Update match R2 completion timestamp
-      const col = isUserA ? 'r2_a_completed_at' : 'r2_b_completed_at';
-      await pool.query(
-        `UPDATE matches SET ${col} = now(), status = 'pending_r2', updated_at = now() WHERE id = $1`,
-        [matchId]
-      );
-
-      await pool.query('COMMIT');
-
-      // Delete draft
-      await pool.query(
-        `DELETE FROM questionnaire_drafts WHERE user_id = $1 AND round = 2 AND match_id = $2`,
-        [req.user.id, matchId]
-      ).catch(() => {});
-
-      // Check if partner also done — if yes, trigger final scoring
-      const updatedMatch = await pool.query(
-        'SELECT r2_a_completed_at, r2_b_completed_at FROM matches WHERE id = $1', [matchId]
-      );
-      const { r2_a_completed_at, r2_b_completed_at } = updatedMatch.rows[0];
-      const bothComplete = !!(r2_a_completed_at && r2_b_completed_at);
-
-      if (bothComplete) {
-        // Mark as scoring
-        await pool.query(
-          `UPDATE matches SET status = 'scoring_r2', updated_at = now() WHERE id = $1`, [matchId]
-        );
-
-        // Run final scoring asynchronously (non-blocking response)
-        runFinalScoring(matchId, 'both_submitted')
-          .then(result => console.log('[R2] Final scoring done:', result))
-          .catch(err  => console.error('[R2] Final scoring error:', err));
-
-        // Notify partner that this user completed
-        const partnerId = isUserA ? match.user_b_id : match.user_a_id;
-        const myName    = (profileResult.rows[0]?.first_name || req.user.name || 'Your match');
-        await notify(partnerId, 'r2_partner_done', {
-          matchId,
-          partnerFirstName: myName,
-        });
+    // Already submitted — show waiting or result
+    if (data.myR2Complete) {
+      if (data.partnerR2Complete) {
+        showResult();
       } else {
-        // Notify partner that they're being waited on
-        const partnerId = isUserA ? match.user_b_id : match.user_a_id;
-        await notify(partnerId, 'r2_partner_done', {
-          matchId,
-          score: match.r1_score,
-        }).catch(() => {});
+        showWaiting(data);
       }
-
-      res.status(201).json({
-        message:      bothComplete
-          ? 'Round 2 submitted. Both users are done — calculating your final score now.'
-          : 'Round 2 submitted. Waiting for your match to complete theirs.',
-        bothComplete,
-        embeddingGenerated: !!embedding,
-      });
-
-    } catch (err) {
-      await pool.query('ROLLBACK').catch(() => {});
-      console.error('R2 submission error:', err);
-      res.status(500).json({ error: 'Submission failed. Your draft is still saved. Please try again.' });
+      return;
     }
-  }
-);
 
-// ══════════════════════════════════════════════════════════════
-//  GET /api/round2/:matchId/status — Check R2 status
-// ══════════════════════════════════════════════════════════════
-router.get('/:matchId/status',
-  requireAuth,
-  [param('matchId').isUUID()],
-  async (req, res) => {
-    const err = checkValidation(req, res);
-    if (err) return;
-
+    // Check for draft
     try {
-      const result = await pool.query(`
-        SELECT
-          m.status,
-          m.r1_score,
-          m.r2_score,
-          m.combined_score,
-          m.r2_expires_at,
-          CASE WHEN m.user_a_id = $2 THEN m.r2_a_completed_at ELSE m.r2_b_completed_at END AS my_r2_at,
-          CASE WHEN m.user_a_id = $2 THEN m.r2_b_completed_at ELSE m.r2_a_completed_at END AS partner_r2_at,
-          EXTRACT(EPOCH FROM (m.r2_expires_at - now())) / 3600 AS hours_remaining,
-          d.current_question AS draft_question,
-          d.answers_count    AS draft_answers
-        FROM matches m
-        LEFT JOIN questionnaire_drafts d
-          ON d.user_id = $2 AND d.round = 2 AND d.match_id = m.id
-        WHERE m.id = $1 AND (m.user_a_id = $2 OR m.user_b_id = $2)
-      `, [req.params.matchId, req.user.id]);
-
-      if (!result.rows[0]) return res.status(404).json({ error: 'Match not found' });
-      const m = result.rows[0];
-
-      res.json({
-        status:          m.status,
-        r1Score:         m.r1_score,
-        r2Score:         m.r2_score,
-        combinedScore:   m.combined_score,
-        myR2Complete:    !!m.my_r2_at,
-        partnerR2Complete: !!m.partner_r2_at,
-        hoursRemaining:  m.hours_remaining ? Math.round(m.hours_remaining) : null,
-        expiresAt:       m.r2_expires_at,
-        draft:           m.draft_question != null ? {
-          currentQuestion: m.draft_question,
-          answersCount:    m.draft_answers,
-        } : null,
-        thresholds: { final: CONFIG.FINAL_THRESHOLD },
+      const dr = await fetch(`${API}/api/round2/${MATCH_ID}/draft`, {
+        headers: { 'Authorization': `Bearer ${TOKEN}` }
       });
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to get status' });
+      const draft = await dr.json();
+      if (draft.hasDraft && draft.answers) {
+        answers    = draft.answers;
+        currentQ   = draft.current_question || 0;
+        toast('Draft restored — continuing where you left off');
+      }
+    } catch {}
+
+    // Load match info for banner
+    const mr = await fetch(`${API}/api/matches/${MATCH_ID}`, {
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    if (mr.ok) {
+      const md = await mr.json();
+      const m  = md.match || md;
+      renderMatchBanner(m);
     }
+
+  } catch (e) {
+    toast('Could not load Round 2 status');
   }
-);
+})();
 
-// ══════════════════════════════════════════════════════════════
-//  POST/GET /api/round2/:matchId/draft — R2 draft save/restore
-// ══════════════════════════════════════════════════════════════
-router.post('/:matchId/draft',
-  requireAuth,
-  [param('matchId').isUUID(), body('current_question').isInt({ min: 0 }), body('answers').isObject()],
-  async (req, res) => {
-    const err = checkValidation(req, res);
-    if (err) return;
+function renderMatchBanner(m) {
+  const name     = m.person?.firstName || 'Your Match';
+  const initials = name[0].toUpperCase();
+  const sub      = [m.person?.age, m.person?.profession, m.person?.city].filter(Boolean).join(' · ');
+  const score    = Math.round(m.score || m.r1_score || 0);
 
-    const answersCount = Object.values(req.body.answers).filter(v => v !== null && v !== undefined).length;
+  document.getElementById('match-banner-intro').innerHTML = `
+    <div class="match-card">
+      <div class="match-av">${initials}</div>
+      <div class="match-info">
+        <div class="match-name">${name}</div>
+        <div class="match-sub">${sub}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="match-score">${score}%</div>
+        <div class="match-score-lbl">R1 Match</div>
+      </div>
+    </div>`;
+}
 
+/* ══════════════════════════════════════════════════
+   QUESTIONNAIRE
+══════════════════════════════════════════════════ */
+function startQuestionnaire() {
+  showScreen('screen-q');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q    = QUESTIONS[currentQ];
+  const total = QUESTIONS.length;
+
+  document.getElementById('q-count').textContent  = `${currentQ + 1} / ${total}`;
+  document.getElementById('progress-fill').style.width = `${((currentQ + 1) / total) * 100}%`;
+  document.getElementById('dim-pill').textContent  = DIM_LABELS[q.dim];
+  document.getElementById('q-number').textContent  = `Question ${currentQ + 1}`;
+  document.getElementById('q-text').textContent    = q.text;
+  document.getElementById('btn-prev').style.display = currentQ === 0 ? 'none' : '';
+
+  const saved = answers[q.id];
+
+  // Render input
+  const inputEl = document.getElementById('q-input');
+  if (q.type === 'scale5') {
+    const labels = ['1', '2', '3', '4', '5'];
+    inputEl.innerHTML = `
+      <div class="scale-wrap">
+        <div class="scale-labels"><span>${q.low}</span><span>${q.high}</span></div>
+        <div class="scale-options">
+          ${labels.map((l, i) => `
+            <button class="scale-btn ${saved?.answer === i+1 ? 'selected' : ''}"
+              onclick="selectScale(${i+1})" data-val="${i+1}">${l}</button>
+          `).join('')}
+        </div>
+      </div>`;
+  } else if (q.type === 'single') {
+    inputEl.innerHTML = `
+      <div class="single-options">
+        ${q.options.map((opt, i) => `
+          <button class="single-btn ${saved?.answer === i ? 'selected' : ''}"
+            onclick="selectSingle(${i}, '${opt.replace(/'/g,"\\'")}')">
+            <div class="radio"></div>${opt}
+          </button>
+        `).join('')}
+      </div>`;
+  } else if (q.type === 'text') {
+    const val = saved?.answer_text || '';
+    inputEl.innerHTML = `
+      <textarea class="text-input" id="text-input" placeholder="Write your answer here…"
+        oninput="handleTextInput(this)" maxlength="500">${val}</textarea>
+      <div class="char-count" id="char-count">${val.length} / 500</div>`;
+  }
+
+  updateNextBtn();
+}
+
+function selectScale(val) {
+  const q = QUESTIONS[currentQ];
+  answers[q.id] = { answer: val, answer_text: String(val), type: 'scale5', skipped: false };
+  document.querySelectorAll('.scale-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`[data-val="${val}"]`)?.classList.add('selected');
+  updateNextBtn();
+  saveDraft();
+}
+
+function selectSingle(idx, text) {
+  const q = QUESTIONS[currentQ];
+  answers[q.id] = { answer: idx, answer_text: text, type: 'single', skipped: false };
+  document.querySelectorAll('.single-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.single-btn')[idx]?.classList.add('selected');
+  updateNextBtn();
+  saveDraft();
+}
+
+function handleTextInput(el) {
+  const q   = QUESTIONS[currentQ];
+  const val = el.value;
+  document.getElementById('char-count').textContent = `${val.length} / 500`;
+  answers[q.id] = { answer: null, answer_text: val, type: 'text', skipped: false };
+  updateNextBtn();
+}
+
+function updateNextBtn() {
+  const q    = QUESTIONS[currentQ];
+  const ans  = answers[q.id];
+  const last = currentQ === QUESTIONS.length - 1;
+  const btn  = document.getElementById('btn-next');
+
+  let hasAnswer = false;
+  if (ans?.skipped)        hasAnswer = true;
+  else if (q.type === 'text') hasAnswer = (ans?.answer_text?.trim().length || 0) >= 10;
+  else                     hasAnswer = ans?.answer !== undefined && ans.answer !== null;
+
+  btn.disabled   = !hasAnswer;
+  btn.textContent = last ? 'Submit Round 2 →' : 'Continue →';
+}
+
+function nextQuestion() {
+  if (currentQ === QUESTIONS.length - 1) {
+    submitRound2();
+  } else {
+    currentQ++;
+    renderQuestion();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function prevQuestion() {
+  if (currentQ > 0) {
+    currentQ--;
+    renderQuestion();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function skipQuestion() {
+  const q = QUESTIONS[currentQ];
+  answers[q.id] = { answer: null, answer_text: null, type: q.type, skipped: true };
+  updateNextBtn();
+  saveDraft();
+  nextQuestion();
+}
+
+/* ══════════════════════════════════════════════════
+   DRAFT SAVE
+══════════════════════════════════════════════════ */
+let draftTimer;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(async () => {
     try {
-      await pool.query(`
-        INSERT INTO questionnaire_drafts
-          (user_id, round, match_id, current_question, answers, answers_count, updated_at)
-        VALUES ($1, 2, $2, $3, $4, $5, now())
-        ON CONFLICT (user_id, round, match_id) DO UPDATE SET
-          current_question = EXCLUDED.current_question,
-          answers          = EXCLUDED.answers,
-          answers_count    = EXCLUDED.answers_count,
-          updated_at       = now()
-      `, [req.user.id, req.params.matchId, req.body.current_question, JSON.stringify(req.body.answers), answersCount]);
+      await fetch(`${API}/api/round2/${MATCH_ID}/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${TOKEN}` },
+        body: JSON.stringify({ current_question: currentQ, answers }),
+      });
+    } catch {}
+  }, 1500);
+}
 
-      res.json({ saved: true, answersCount });
-    } catch (err) {
-      res.status(500).json({ error: 'Draft save failed' });
-    }
-  }
-);
+/* ══════════════════════════════════════════════════
+   SUBMIT
+══════════════════════════════════════════════════ */
+async function submitRound2() {
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
 
-router.get('/:matchId/draft', requireAuth, [param('matchId').isUUID()], async (req, res) => {
-  const err = checkValidation(req, res);
-  if (err) return;
+  // Build responses array
+  const responses = QUESTIONS.map(q => {
+    const a = answers[q.id] || { skipped: true };
+    return {
+      question_id:  q.id,
+      dimension:    q.dim,
+      type:         q.type,
+      answer:       a.skipped ? null : a.answer,
+      answer_text:  a.skipped ? null : a.answer_text,
+      sensitive:    q.sensitive,
+      skipped:      !!a.skipped,
+    };
+  });
 
   try {
-    const result = await pool.query(
-      `SELECT current_question, answers, answers_count, updated_at FROM questionnaire_drafts
-       WHERE user_id = $1 AND round = 2 AND match_id = $2`,
-      [req.user.id, req.params.matchId]
-    );
-    if (!result.rows[0]) return res.json({ hasDraft: false });
-    res.json({ hasDraft: true, ...result.rows[0] });
+    const res  = await fetch(`${API}/api/round2/${MATCH_ID}`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${TOKEN}` },
+      body: JSON.stringify({ responses }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast(data.error || 'Submission failed. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Submit Round 2 →';
+      return;
+    }
+
+    if (data.bothComplete) {
+      showResult();
+    } else {
+      showWaiting({ myR2Complete: true, partnerR2Complete: false });
+    }
+
+  } catch (e) {
+    toast('Network error. Please try again.');
+    btn.disabled = false;
+    btn.textContent = 'Submit Round 2 →';
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   RESULT & WAITING
+══════════════════════════════════════════════════ */
+async function showResult() {
+  try {
+    const res  = await fetch(`${API}/api/round2/${MATCH_ID}/result`, {
+      headers: { 'Authorization': `Bearer ${TOKEN}` }
+    });
+    const data = await res.json();
+
+    if (data.approved) {
+      const score = Math.round(data.scores?.combined || 0);
+      document.getElementById('combined-score').textContent = `${score}%`;
+      document.getElementById('approved-p').textContent =
+        data.compatibilitySummary ||
+        `Your combined compatibility score of ${score}% puts you in the top tier. Unlock your conversation to begin.`;
+      showScreen('screen-approved');
+    } else if (data.status === 'declined') {
+      showScreen('screen-declined');
+    } else {
+      // Still scoring — show waiting
+      showWaiting({ myR2Complete: true, partnerR2Complete: false });
+    }
   } catch {
-    res.status(500).json({ error: 'Draft restore failed' });
+    showWaiting({ myR2Complete: true, partnerR2Complete: false });
   }
-});
+}
 
-// ══════════════════════════════════════════════════════════════
-//  GET /api/round2/:matchId/result — Get final result
-// ══════════════════════════════════════════════════════════════
-router.get('/:matchId/result',
-  requireAuth,
-  [param('matchId').isUUID()],
-  async (req, res) => {
-    const err = checkValidation(req, res);
-    if (err) return;
+function showWaiting(data) {
+  const myName      = 'You';
+  const partnerName = matchData?.partner?.firstName || 'Your match';
 
-    try {
-      const result = await pool.query(`
-        SELECT
-          m.id, m.r1_score, m.r2_score, m.combined_score, m.status,
-          m.score_breakdown, m.compatibility_summary, m.shared_values,
-          m.icebreakers, m.messaging_unlocked_at, m.expires_at,
-          p.first_name, p.date_of_birth, p.profession, p.city,
-          p.religion, p.practice_level, p.relationship_goal,
-          ARRAY[]::text[] AS photos
-        FROM matches m
-        JOIN profiles p ON p.user_id = (
-          CASE WHEN m.user_a_id = $2 THEN m.user_b_id ELSE m.user_a_id END
-        )
-        WHERE m.id = $1 AND (m.user_a_id = $2 OR m.user_b_id = $2)
-        GROUP BY m.id, p.id
-      `, [req.params.matchId, req.user.id]);
+  document.getElementById('waiting-status').innerHTML = `
+    <div class="status-row">
+      <span class="status-name">${myName}</span>
+      <span class="status-badge badge-done">✓ Complete</span>
+    </div>
+    <div class="status-row">
+      <span class="status-name">${partnerName}</span>
+      <span class="status-badge ${data.partnerR2Complete ? 'badge-done' : 'badge-pending'}">
+        ${data.partnerR2Complete ? '✓ Complete' : 'In progress…'}
+      </span>
+    </div>`;
 
-      if (!result.rows[0]) return res.status(404).json({ error: 'Match not found' });
-      const m = result.rows[0];
+  showScreen('screen-waiting');
 
-      const isComplete  = ['approved','declined','messaging_unlocked'].includes(m.status);
-      const isApproved  = ['approved','messaging_unlocked'].includes(m.status);
-      const age = m.date_of_birth
-        ? Math.floor((Date.now() - new Date(m.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000))
-        : null;
-
-      res.json({
-        matchId:         m.id,
-        status:          m.status,
-        resultReady:     isComplete,
-        approved:        isApproved,
-        scores: {
-          r1:       m.r1_score,
-          r2:       m.r2_score,
-          combined: m.combined_score,
-          threshold: CONFIG.FINAL_THRESHOLD,
-        },
-        breakdown:             m.score_breakdown,
-        compatibilitySummary:  isApproved ? m.compatibility_summary : null,
-        sharedValues:          isApproved ? m.shared_values : null,
-        icebreakers:           m.status === 'messaging_unlocked' ? m.icebreakers : null,
-        partner: isApproved ? {
-          firstName:       m.first_name,
-          age,
-          profession:      m.profession,
-          city:            m.city,
-          religion:        m.religion,
-          practiceLevel:   m.practice_level,
-          relationshipGoal:m.relationship_goal,
-          photos:          m.photos || [],
-        } : null,
-        messagingUnlockedAt: m.messaging_unlocked_at,
-        expiresAt:           m.expires_at,
-      });
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to get result' });
-    }
+  // Poll for partner completion every 15s
+  if (!data.partnerR2Complete) {
+    const poll = setInterval(async () => {
+      try {
+        const res  = await fetch(`${API}/api/round2/${MATCH_ID}/status`, {
+          headers: { 'Authorization': `Bearer ${TOKEN}` }
+        });
+        const d = await res.json();
+        if (d.partnerR2Complete) {
+          clearInterval(poll);
+          showResult();
+        }
+      } catch {}
+    }, 15000);
   }
-);
+}
 
-// ══════════════════════════════════════════════════════════════
-//  POST /api/round2/admin/rescore/:matchId — Admin re-score
-// ══════════════════════════════════════════════════════════════
-router.post('/admin/rescore/:matchId', requireAdmin, [param('matchId').isUUID()], async (req, res) => {
-  const err = checkValidation(req, res);
-  if (err) return;
+function goToPayment() {
+  window.location.href = `/payment.html?matchId=${MATCH_ID}`;
+}
 
-  try {
-    const result = await runFinalScoring(req.params.matchId, 'admin');
-    res.json({ message: 'Final scoring complete.', result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+/* ══════════════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-module.exports = router;
-module.exports.runFinalScoring = runFinalScoring;
-
-// ══════════════════════════════════════════════════════════════
-//  MOUNT IN server.js:
-//
-//  const round2Routes = require('./round2-routes');
-//  app.use('/api/round2', round2Routes);
-// ══════════════════════════════════════════════════════════════
+let toastT;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
