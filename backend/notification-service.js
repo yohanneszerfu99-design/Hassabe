@@ -368,17 +368,19 @@ async function sendEmail(toEmail, firstName, subject, type, data, fallbackTitle,
 // ═══════════════════════════════════════════════════════════════
 
 function buildEmailHTML(type, firstName, data, title, body) {
+  const BASE = 'https://hassabe.com';
+  const mid  = data.matchId ? `?matchId=${data.matchId}` : '';
   const ctaConfig = {
-    new_match:          { text: 'View My Match →',      url: 'https://hassabe.com/matches' },
-    r2_reminder:        { text: 'Complete Round 2 →',   url: 'https://hassabe.com/matches' },
-    r2_partner_done:    { text: 'Complete Round 2 →',   url: 'https://hassabe.com/matches' },
-    match_approved:     { text: 'Unlock Conversation →',url: 'https://hassabe.com/matches' },
-    match_declined:     { text: 'Back to Dashboard →',  url: 'https://hassabe.com/dashboard' },
-    match_expiring:     { text: 'Open Conversation →',  url: 'https://hassabe.com/messages' },
-    messaging_unlocked: { text: 'Start the Conversation →', url: 'https://hassabe.com/messages' },
-    message_received:   { text: 'Reply Now →',          url: 'https://hassabe.com/messages' },
-    profile_incomplete: { text: 'Complete My Profile →',url: 'https://hassabe.com/profile' },
-    community_event:    { text: 'RSVP Now →',           url: data.eventUrl || 'https://hassabe.com' },
+    new_match:          { text: 'Begin Round 2 →',           url: `${BASE}/round2.html${mid}` },
+    r2_reminder:        { text: 'Complete Round 2 →',        url: `${BASE}/round2.html${mid}` },
+    r2_partner_done:    { text: 'Complete Round 2 →',        url: `${BASE}/round2.html${mid}` },
+    match_approved:     { text: 'Unlock Conversation →',     url: `${BASE}/payment.html${mid}` },
+    match_declined:     { text: 'Back to Matches →',         url: `${BASE}/matches.html` },
+    match_expiring:     { text: 'Open Conversation →',       url: `${BASE}/chat.html${mid}` },
+    messaging_unlocked: { text: 'Start the Conversation →',  url: `${BASE}/chat.html${mid}` },
+    message_received:   { text: 'Reply Now →',               url: `${BASE}/chat.html${mid}` },
+    profile_incomplete: { text: 'Complete My Profile →',     url: `${BASE}/profile.html` },
+    community_event:    { text: 'RSVP Now →',                url: data.eventUrl || BASE },
   };
 
   const cta = ctaConfig[type] || { text: 'Open Hassabe →', url: 'https://hassabe.com' };
