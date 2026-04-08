@@ -28,6 +28,15 @@
 
 require('dotenv').config();
 
+let notifyPair;
+try {
+  const notifService = require('./notification-service');
+  notifyPair = notifService.notifyPair;
+} catch (e) {
+  console.warn('[Engine] notification-service not loaded:', e.message);
+  notifyPair = async () => {};
+}
+
 const { Pool }  = require('pg');
 const OpenAI    = require('openai');
 
@@ -697,28 +706,34 @@ async function computeFinalScore(matchId) {
 // ══════════════════════════════════════════════════════════════
 
 async function queueMatchNotifications(userIdA, userIdB, matchId, score, summary) {
-  // In Step 6, this calls the notification service:
-  // await notificationQueue.add('match_found', {
-  //   userIds: [userIdA, userIdB],
-  //   matchId, score,
-  //   title: 'You have a new compatibility match',
-  //   body:  `Hassabe found someone with ${score}% compatibility. Complete Round 2 to unlock.`,
-  //   data:  { type: 'new_match', matchId }
-  // });
-  console.log(`  [Notify] Queued match notifications for users ${userIdA.slice(0,8)} & ${userIdB.slice(0,8)}`);
+  try {
+    const sharedValues = summary?.shared_values || [];
+    const notifData = {
+      matchId,
+      score:        Math.round(score),
+      expiryHours:  72,
+      sharedValues,
+    };
+    await notifyPair(userIdA, userIdB, 'new_match', notifData, notifData);
+    console.log(`  [Notify] new_match sent to users ${userIdA.slice(0,8)} & ${userIdB.slice(0,8)}`);
+  } catch (err) {
+    console.error('[Notify] queueMatchNotifications failed:', err.message);
+  }
 }
 
 async function queueResultNotifications(userIdA, userIdB, matchId, score, status, summary) {
-  const isApproved = status === 'approved';
-  const title = isApproved
-    ? `Your match has been confirmed — ${score}%`
-    : 'Match update from Hassabe';
-  const body  = isApproved
-    ? 'You and your match have passed both compatibility rounds. Unlock your conversation to begin.'
-    : 'This match was not advanced based on compatibility criteria. We continue working to find the right person for you.';
-
-  // await notificationQueue.add('match_result', { userIds: [userIdA, userIdB], matchId, title, body, data: { type: 'match_result', matchId, status } });
-  console.log(`[Notify] Queued result notification: ${status} for match ${matchId}`);
+  try {
+    const type     = status === 'approved' ? 'match_approved' : 'match_declined';
+    const notifData = {
+      matchId,
+      combinedScore: Math.round(score),
+      sharedValues:  summary?.shared_values || [],
+    };
+    await notifyPair(userIdA, userIdB, type, notifData, notifData);
+    console.log(`[Notify] ${type} sent for match ${matchId}`);
+  } catch (err) {
+    console.error('[Notify] queueResultNotifications failed:', err.message);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
