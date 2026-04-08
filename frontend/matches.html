@@ -64,6 +64,7 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webk
 .empty-ico{font-size:38px;margin-bottom:12px;opacity:.28}
 .empty-h{font-family:'Cormorant Garamond',serif;font-size:22px;color:#2A1C06;margin-bottom:6px}
 .empty-p{font-size:13px;color:#9A8A72;line-height:1.7;max-width:300px;margin:0 auto}
+.nav-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#C9A84C;color:#0C0902;font-size:10px;font-weight:700;margin-left:4px;vertical-align:middle}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:#2A1C06;color:#E8D5A3;padding:8px 16px;border-radius:3px;font-size:12.5px;z-index:999;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;border:.5px solid rgba(201,168,76,.2)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media(max-width:560px){.ch{flex-wrap:wrap}.cf{flex-direction:column;align-items:flex-start}}
@@ -75,7 +76,7 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webk
     <a href="/landing.html" style="display:inline-flex;align-items:center;text-decoration:none"><img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle"></a>
     <div class="nav-links">
       <a class="nav-link active" href="/matches.html">Matches</a>
-      <a class="nav-link" href="/notifications.html">Alerts</a>
+      <a class="nav-link" href="/notifications.html" id="alerts-link">Alerts</a>
       <a class="nav-link" href="/chat.html">Chat</a>
       <a class="nav-link" href="#" onclick="window.Auth.clear();location.href='/auth.html'">Sign out</a>
     </div>
@@ -211,6 +212,23 @@ function card(m) {
 
 let tt;
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),3000);}
+
+// Alert badge count
+(async function loadAlertBadge() {
+  const token = window.Auth?.getToken?.() || localStorage.getItem('hassabe_token');
+  if (!token) return;
+  try {
+    const res  = await fetch(window.HASSABE_CONFIG.API + '/api/notifications/unread-count', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const { count } = await res.json();
+    if (count > 0) {
+      const link = document.getElementById('alerts-link');
+      if (link) link.insertAdjacentHTML('beforeend', `<span class="nav-badge">${count}</span>`);
+    }
+  } catch {}
+})();
 </script>
 </body>
 </html>
