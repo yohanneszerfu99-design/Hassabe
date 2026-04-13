@@ -34,8 +34,11 @@ try {
   let notifService;
   try { notifService = require('./notification-service'); }
   catch { notifService = require('./routes/notification-service'); }
-  notifyPair = notifService.notifyPair;
-  console.log('[Engine] notification-service loaded OK');
+  // Handle both export styles
+  notifyPair = notifService.notifyPair
+    || notifService.default?.notifyPair
+    || notifService.notificationService?.notifyPair;
+  console.log('[Engine] notification-service loaded, notifyPair:', typeof notifyPair);
 } catch (e) {
   console.warn('[Engine] notification-service not loaded:', e.message);
   notifyPair = async () => {};
