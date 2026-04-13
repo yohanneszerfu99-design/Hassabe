@@ -30,8 +30,12 @@ require('dotenv').config();
 
 let notifyPair;
 try {
-  const notifService = require('./notification-service');
+  // Try root first, then routes/ subfolder
+  let notifService;
+  try { notifService = require('./notification-service'); }
+  catch { notifService = require('./routes/notification-service'); }
   notifyPair = notifService.notifyPair;
+  console.log('[Engine] notification-service loaded OK');
 } catch (e) {
   console.warn('[Engine] notification-service not loaded:', e.message);
   notifyPair = async () => {};
