@@ -69,6 +69,24 @@ function checkValidation(req, res) {
   return null;
 }
 
+// ── Admin auth middleware (for admin-only questionnaire endpoints) ──
+async function requireAdmin(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authorization required' });
+  try {
+    const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET, {
+      issuer: 'hassabe.com', audience: 'hassabe-api',
+    });
+    const result = await pool.query(
+      'SELECT id, name, email, status, is_admin FROM users WHERE id = $1', [payload.sub]
+    );
+    if (!result.rows[0]) return res.status(401).json({ error: 'Account not found' });
+    if (!result.rows[0].is_admin) return res.status(403).json({ error: 'Admin access required' });
+    req.admin = result.rows[0];
+    next();
+  } catch { return res.status(401).json({ error: 'Invalid token' }); }
+}
+
 // ══════════════════════════════════════════════════════════════
 //  THE EMBEDDING PIPELINE
 //  Converts structured questionnaire responses into a rich text
