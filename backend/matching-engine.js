@@ -28,21 +28,25 @@
 
 require('dotenv').config();
 
-let notifyPair;
+// ── Load notification service ────────────────────────────────
+// Try both possible locations. Fail loudly if notifyPair is missing.
+let notifModule;
 try {
-  // Try root first, then routes/ subfolder
-  let notifService;
-  try { notifService = require('./notification-service'); }
-  catch { notifService = require('./routes/notification-service'); }
-  // Handle both export styles
-  notifyPair = notifService.notifyPair
-    || notifService.default?.notifyPair
-    || notifService.notificationService?.notifyPair;
-  console.log('[Engine] notification-service loaded, notifyPair:', typeof notifyPair);
-} catch (e) {
-  console.warn('[Engine] notification-service not loaded:', e.message);
-  notifyPair = async () => {};
+  notifModule = require('./notification-service');
+} catch {
+  notifModule = require('./routes/notification-service');
 }
+
+const { notifyPair } = notifModule;
+
+if (typeof notifyPair !== 'function') {
+  console.error('[Engine] CRITICAL: notifyPair is not a function!',
+    'Got:', typeof notifyPair,
+    'Module keys:', Object.keys(notifModule)
+  );
+  throw new Error('notifyPair failed to load — check notification-service.js exports');
+}
+console.log('[Engine] notifyPair loaded successfully');
 
 const { Pool }  = require('pg');
 const OpenAI    = require('openai');
