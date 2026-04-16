@@ -28,25 +28,121 @@
 
 require('dotenv').config();
 
-// ── Load notification service ────────────────────────────────
-// Try both possible locations. Fail loudly if notifyPair is missing.
-let notifModule;
+// ── Load notification service (with self-contained fallback) ──
+let notifyPair;
 try {
-  notifModule = require('./notification-service');
-} catch {
-  notifModule = require('./routes/notification-service');
-}
+  let notifModule;
+  try { notifModule = require('./notification-service'); }
+  catch { notifModule = require('./routes/notification-service'); }
 
-const { notifyPair } = notifModule;
+  notifyPair = notifModule.notifyPair;
+  if (typeof notifyPair !== 'function') {
+    throw new Error(`notifyPair is ${typeof notifyPair}, keys: ${Object.keys(notifModule)}`);
+  }
+  console.log('[Engine] notifyPair loaded from notification-service ✓');
+} catch (err) {
+  console.warn('[Engine] notification-service failed:', err.message);
+  console.warn('[Engine] Using direct-email fallback for match notifications');
 
-if (typeof notifyPair !== 'function') {
-  console.error('[Engine] CRITICAL: notifyPair is not a function!',
-    'Got:', typeof notifyPair,
-    'Module keys:', Object.keys(notifModule)
-  );
-  throw new Error('notifyPair failed to load — check notification-service.js exports');
+  // ── Self-contained fallback: send emails + in-app directly ──
+  const { Resend } = require('resend');
+  const fallbackResend = new Resend(process.env.RESEND_API_KEY);
+  const { Pool: FBPool } = require('pg');
+  const fallbackPool = new FBPool({ connectionString: process.env.DATABASE_URL });
+
+  notifyPair = async (userAId, userBId, type, dataA = {}, dataB = {}) => {
+    console.log(`[Fallback-Notify] ${type} → users ${userAId.slice(0,8)} & ${userBId.slice(0,8)}`);
+
+    for (const { userId, data } of [
+      { userId: userAId, data: dataA },
+      { userId: userBId, data: dataB },
+    ]) {
+      try {
+        // 1. In-app notification
+        const title = type === 'new_match'
+          ? '✦ You have a new compatibility match'
+          : type === 'match_approved'
+            ? '★ Your match has been confirmed'
+            : 'A match update from Hassabe';
+        const body = type === 'new_match'
+          ? `Hassabe found someone with ${data.score}% compatibility. Complete Round 2 within 72 hours.`
+          : type === 'match_approved'
+            ? `Congratulations — combined score of ${data.combinedScore}%. Unlock your conversation now.`
+            : 'This match was not advanced. We continue working to find the right person for you.';
+
+        await fallbackPool.query(
+          `INSERT INTO notifications (user_id, type, title, body, data)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [userId, type, title, body, JSON.stringify(data)]
+        );
+        console.log(`  [Fallback] in-app notification saved for ${userId.slice(0,8)}`);
+
+        // 2. Email notification
+        const userResult = await fallbackPool.query(
+          `SELECT u.email, p.first_name FROM public.users u
+           LEFT JOIN profiles p ON p.user_id = u.id
+           WHERE u.id = $1`, [userId]
+        );
+        const user = userResult.rows[0];
+        if (!user?.email) {
+          console.warn(`  [Fallback] No email found for user ${userId.slice(0,8)}`);
+          continue;
+        }
+
+        const matchUrl = data.matchId
+          ? `https://hassabe.com/${type === 'match_approved' ? 'payment' : 'round2'}.html?matchId=${data.matchId}`
+          : 'https://hassabe.com/matches.html';
+
+        await fallbackResend.emails.send({
+          from:    'Hassabe <admin@hassabe.com>',
+          to:      user.email,
+          subject: type === 'new_match'
+            ? `✦ Hassabe found a ${data.score}% compatibility match for you`
+            : type === 'match_approved'
+              ? `★ ${data.combinedScore}% — Your Hassabe match is confirmed`
+              : 'A match update from Hassabe',
+          html: `<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#FDF8F0;font-family:'Helvetica Neue',Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#FDF8F0;padding:40px 20px">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border:0.5px solid rgba(201,168,76,0.2);border-radius:6px;overflow:hidden">
+  <tr><td style="background:#0C0902;padding:28px 32px;text-align:center">
+    <div style="font-family:Georgia,serif;font-size:28px;color:#FAF0DC;letter-spacing:0.02em">Hassabe</div>
+    <div style="font-size:11px;color:rgba(232,213,163,0.4);letter-spacing:0.16em;text-transform:uppercase;margin-top:4px">ሃሳቤ · ሓሳቤ</div>
+  </td></tr>
+  <tr><td style="padding:36px 32px">
+    <p style="font-size:15px;color:#2A1C06;margin:0 0 6px 0">Hello ${user.first_name || 'there'},</p>
+    <h1 style="font-family:Georgia,serif;font-size:24px;font-weight:400;color:#2A1C06;line-height:1.2;margin:0 0 16px 0">${title}</h1>
+    <p style="font-size:14px;color:#5A4A2E;line-height:1.75;margin:0 0 20px 0">${body}</p>
+    ${data.score || data.combinedScore ? `
+    <div style="text-align:center;margin:24px 0">
+      <div style="display:inline-block;background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.3);border-radius:4px;padding:16px 28px">
+        <div style="font-family:Georgia,serif;font-size:52px;color:#C9A84C;line-height:1">${data.combinedScore || data.score}%</div>
+        <div style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(201,168,76,0.5);margin-top:4px">Compatibility Score</div>
+      </div>
+    </div>` : ''}
+    <table cellpadding="0" cellspacing="0" style="margin:28px auto">
+    <tr><td align="center" style="border-radius:3px;background:#C9A84C">
+      <a href="${matchUrl}" style="display:block;padding:14px 32px;font-size:13px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#0C0902;text-decoration:none">${type === 'match_approved' ? 'Unlock Conversation →' : 'Begin Round 2 →'}</a>
+    </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background:#F7F1E8;padding:16px 32px;text-align:center;border-top:0.5px solid rgba(139,105,20,0.1)">
+    <p style="font-size:11px;color:#B5A88C;margin:0">© 2025 Hassabe Inc.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`,
+          text: `${title}\n\n${body}\n\nOpen Hassabe: ${matchUrl}`,
+        });
+        console.log(`  [Fallback] email sent to ${user.email}`);
+
+      } catch (innerErr) {
+        console.error(`  [Fallback] Failed for user ${userId.slice(0,8)}:`, innerErr.message);
+      }
+    }
+  };
 }
-console.log('[Engine] notifyPair loaded successfully');
 
 const { Pool }  = require('pg');
 const OpenAI    = require('openai');
