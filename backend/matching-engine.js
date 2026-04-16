@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  HASSABE — AI Matching Engine  (Step  5)
+//  HASSABE — AI Matching Engine  (Step 5)
 //  File: matching-engine.js
 //
 //  This is the heart of Hassabe. Run as a scheduled nightly job
