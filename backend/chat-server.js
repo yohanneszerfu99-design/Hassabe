@@ -219,15 +219,30 @@ function initChatServer(httpServer) {
           return socket.emit('error', { code: access.code });
         }
 
+        // Content moderation check
+        const modResult = moderateContent(content);
+        if (modResult.blocked) {
+          console.log(`[Moderation] BLOCKED message from ${socket.userId.slice(0,8)}: ${modResult.reason}`);
+          return socket.emit('error', {
+            code: 'MESSAGE_BLOCKED',
+            message: 'This message could not be sent. Please keep conversations respectful.',
+          });
+        }
+
+        if (modResult.flagged) {
+          console.log(`[Moderation] FLAGGED message from ${socket.userId.slice(0,8)}: ${modResult.reason}`);
+        }
+
         const message = await pool.query(`
           INSERT INTO messages
-            (match_id, sender_id, content, type, client_msg_id)
-          VALUES ($1, $2, $3, $4, $5)
+            (match_id, sender_id, content, type, client_msg_id, is_flagged, flag_reason)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
           ON CONFLICT (client_msg_id) WHERE client_msg_id IS NOT NULL
           DO UPDATE SET updated_at = now()
           RETURNING id, match_id, sender_id, content, type,
-                    sent_at, read_at, client_msg_id
-        `, [matchId, socket.userId, content.trim(), type, clientMsgId || null]);
+                    sent_at, read_at, client_msg_id, is_flagged
+        `, [matchId, socket.userId, content.trim(), type, clientMsgId || null,
+            modResult.flagged, modResult.reason]);
 
         const msg = message.rows[0];
 
@@ -435,6 +450,76 @@ function initChatServer(httpServer) {
 
   console.log('[Chat] Socket.IO server initialized');
   return io;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CONTENT MODERATION FILTER
+//  Checks messages for vulgar/inappropriate content.
+//  Returns { flagged: bool, reason: string|null, blocked: bool }
+//  - flagged: message saved but marked for admin review
+//  - blocked: message not sent at all (severe content)
+// ══════════════════════════════════════════════════════════════
+
+const BLOCKED_PATTERNS = [
+  // Severe: threats, harassment, slurs — these get blocked entirely
+  /\b(kill\s+(your|my|her|him)self|i'?ll\s+kill\s+you|death\s+threat)\b/i,
+];
+
+const FLAGGED_WORDS = new Set([
+  // Vulgar language
+  'fuck', 'fucking', 'fucked', 'fucker', 'fucks',
+  'shit', 'shitting', 'bullshit',
+  'bitch', 'bitches', 'bitching',
+  'ass', 'asshole', 'assholes',
+  'dick', 'dicks', 'dickhead',
+  'pussy', 'pussies',
+  'cock', 'cocks',
+  'cunt', 'cunts',
+  'whore', 'whores', 'slut', 'sluts',
+  'bastard', 'bastards',
+  'damn', 'damned', 'dammit',
+  'crap', 'crappy',
+  'piss', 'pissed', 'pissing',
+  // Sexual solicitation
+  'sext', 'sexting', 'nudes', 'nude', 'naked',
+  'hookup', 'hook up', 'one night stand',
+  'friends with benefits', 'fwb', 'dtf',
+  // Hate speech
+  'nigger', 'nigga', 'faggot', 'fag', 'retard', 'retarded',
+  'tranny', 'kike', 'spic', 'chink', 'wetback', 'towelhead',
+]);
+
+function moderateContent(text) {
+  if (!text) return { flagged: false, reason: null, blocked: false };
+
+  const lower = text.toLowerCase();
+
+  // 1. Check for blocked patterns (severe — message not sent)
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(lower)) {
+      return { flagged: true, reason: 'severe_threat', blocked: true };
+    }
+  }
+
+  // 2. Check for flagged words (message sent but flagged for review)
+  const words = lower.replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+  const found = words.filter(w => FLAGGED_WORDS.has(w));
+
+  if (found.length > 0) {
+    return {
+      flagged: true,
+      reason: `vulgar_language: ${[...new Set(found)].slice(0, 3).join(', ')}`,
+      blocked: false,
+    };
+  }
+
+  // 3. Check for excessive caps (shouting/aggression)
+  const capsRatio = (text.match(/[A-Z]/g) || []).length / Math.max(text.length, 1);
+  if (text.length > 20 && capsRatio > 0.7) {
+    return { flagged: true, reason: 'excessive_caps', blocked: false };
+  }
+
+  return { flagged: false, reason: null, blocked: false };
 }
 
 // ══════════════════════════════════════════════════════════════
