@@ -308,33 +308,35 @@ async function runFinalScoring(matchId, triggeredBy = 'auto') {
     }
   }
 
-  // 8. Update match record — scores and status
-  await pool.query(`
-    UPDATE matches SET
-      r2_score       = $1,
-      combined_score = $2,
-      status         = $3,
-      updated_at     = now()
-    WHERE id = $4
-  `, [r2Score, combined, status, matchId]);
-
-  // Update summary separately if generated
+  // 8. Update match record — scores, status, and summary in one query
   if (summaryData) {
     await pool.query(`
       UPDATE matches SET
-        compatibility_summary = $1,
-        shared_values         = $2,
-        icebreakers           = $3,
-        friction_points       = $4,
+        r2_score              = $1,
+        combined_score        = $2,
+        status                = $3,
+        compatibility_summary = $5,
+        shared_values         = $6,
+        icebreakers           = $7,
+        friction_points       = $8,
         updated_at            = now()
-      WHERE id = $5
+      WHERE id = $4
     `, [
-      summaryData.summary        || null,
-      JSON.stringify(summaryData.shared_values  || []),
-      JSON.stringify(summaryData.icebreakers    || []),
-      JSON.stringify(summaryData.friction_points|| []),
-      matchId,
+      r2Score, combined, status, matchId,
+      summaryData.summary         || null,
+      JSON.stringify(summaryData.shared_values   || []),
+      JSON.stringify(summaryData.icebreakers     || []),
+      JSON.stringify(summaryData.friction_points || []),
     ]);
+  } else {
+    await pool.query(`
+      UPDATE matches SET
+        r2_score       = $1,
+        combined_score = $2,
+        status         = $3,
+        updated_at     = now()
+      WHERE id = $4
+    `, [r2Score, combined, status, matchId]);
   }
 
   // 9. Send notifications to both users
