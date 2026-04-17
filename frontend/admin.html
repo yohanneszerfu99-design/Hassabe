@@ -165,6 +165,14 @@ tr:hover td{background:rgba(201,168,76,.03)}
 .dp-key{color:rgba(232,213,163,.38)}
 .dp-val{color:rgba(232,213,163,.72)}
 .dp-actions{display:flex;flex-direction:column;gap:7px;margin-top:18px}
+.dp-bio{font-size:12px;color:rgba(232,213,163,.55);line-height:1.6;padding:8px 0;font-style:italic;border-left:2px solid rgba(201,168,76,.15);padding-left:10px;margin:4px 0}
+.dp-dim-bar{display:flex;align-items:center;gap:8px;padding:4px 0}
+.dp-dim-label{font-size:10px;color:rgba(232,213,163,.38);width:80px;text-transform:capitalize}
+.dp-dim-track{flex:1;height:6px;background:rgba(201,168,76,.08);border-radius:3px;overflow:hidden}
+.dp-dim-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,rgba(201,168,76,.3),#C9A84C);transition:width .4s ease}
+.dp-dim-val{font-size:10px;color:rgba(232,213,163,.5);width:28px;text-align:right}
+.dp-narrative{font-size:11.5px;color:rgba(232,213,163,.45);line-height:1.65;padding:8px 0;max-height:120px;overflow-y:auto}
+.dp-tag{display:inline-block;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.15);border-radius:12px;padding:2px 8px;font-size:10px;color:rgba(201,168,76,.6);margin:2px}
 
 /* ── TOAST ── */
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:#1A1208;color:#E8D5A3;padding:9px 18px;border-radius:3px;font-size:12.5px;z-index:999;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;border:.5px solid rgba(201,168,76,.2)}
@@ -559,25 +567,75 @@ async function openUserDetail(userId) {
     const data = await res.json();
     const u    = data.user || {};
     const initials = ((u.first_name||'?')[0]+(u.last_name||'?')[0]).toUpperCase();
+    const age = u.age || (u.date_of_birth ? Math.floor((Date.now() - new Date(u.date_of_birth).getTime()) / (365.25*24*3600*1000)) : '—');
+
+    // Find R1 questionnaire with dimension scores
+    const r1 = (data.questionnaires||[]).find(q => q.round === 1 && q.status === 'complete');
+    const dimScores = r1?.dimension_scores || {};
+    const narrative = r1?.narrative_text || '';
+    const dimOrder = ['values','culture','faith','family','communication','goals','lifestyle'];
+
+    // Build dimension bars HTML
+    const dimBarsHTML = dimOrder
+      .filter(d => dimScores[d] !== undefined)
+      .map(d => `
+        <div class="dp-dim-bar">
+          <span class="dp-dim-label">${d}</span>
+          <div class="dp-dim-track"><div class="dp-dim-fill" style="width:${dimScores[d]}%"></div></div>
+          <span class="dp-dim-val">${dimScores[d]}</span>
+        </div>`).join('');
+
+    // Languages tags
+    const langs = Array.isArray(u.languages) ? u.languages : [];
+    const langsHTML = langs.length ? langs.map(l => `<span class="dp-tag">${l}</span>`).join('') : '<span style="font-size:11px;color:rgba(232,213,163,.28)">—</span>';
+
     document.getElementById('detail-content').innerHTML = `
       <div class="dp-av">${initials}</div>
       <div class="dp-name">${u.first_name||''} ${u.last_name||''}</div>
       <div class="dp-email">${u.email||''}</div>
-      <div class="dp-section-lbl">Profile</div>
-      <div class="dp-row"><span class="dp-key">City</span><span class="dp-val">${u.city||'—'}</span></div>
-      <div class="dp-row"><span class="dp-key">Religion</span><span class="dp-val">${(u.religion||'—').replace(/_/g,' ')}</span></div>
+
+      <div class="dp-section-lbl">Personal</div>
+      <div class="dp-row"><span class="dp-key">Age</span><span class="dp-val">${age}</span></div>
+      <div class="dp-row"><span class="dp-key">City</span><span class="dp-val">${u.city||'—'}${u.country ? ', '+u.country : ''}</span></div>
       <div class="dp-row"><span class="dp-key">Profession</span><span class="dp-val">${u.profession||'—'}</span></div>
+      <div class="dp-row"><span class="dp-key">Education</span><span class="dp-val">${(u.education_level||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Ethnicity</span><span class="dp-val">${(u.ethnicity||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Languages</span><span class="dp-val">${langsHTML}</span></div>
+
+      <div class="dp-section-lbl">Faith & Values</div>
+      <div class="dp-row"><span class="dp-key">Religion</span><span class="dp-val">${(u.religion||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Practice level</span><span class="dp-val">${(u.practice_level||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Heritage strength</span><span class="dp-val">${(u.heritage_strength||'—').replace(/_/g,' ')}</span></div>
+
+      <div class="dp-section-lbl">Relationship</div>
+      <div class="dp-row"><span class="dp-key">Goal</span><span class="dp-val">${(u.relationship_goal||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Children</span><span class="dp-val">${(u.children_preference||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Relocation</span><span class="dp-val">${(u.open_to_relocation||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Seeking</span><span class="dp-val">${(u.seeking||'—')}</span></div>
+      <div class="dp-row"><span class="dp-key">Age range</span><span class="dp-val">${u.partner_age_min||18}–${u.partner_age_max||99}</span></div>
+
+      ${u.bio ? `<div class="dp-section-lbl">Bio</div><div class="dp-bio">"${u.bio}"</div>` : ''}
+
+      ${dimBarsHTML ? `<div class="dp-section-lbl">R1 Dimension Scores</div>${dimBarsHTML}` : ''}
+
+      ${narrative ? `<div class="dp-section-lbl">R1 Narrative</div><div class="dp-narrative">${narrative.slice(0,500)}${narrative.length>500?'…':''}</div>` : ''}
+
+      <div class="dp-section-lbl">Account</div>
       <div class="dp-row"><span class="dp-key">Profile score</span><span class="dp-val">${u.profile_score||0}/100</span></div>
       <div class="dp-row"><span class="dp-key">Status</span><span class="dp-val">${u.status||'active'}</span></div>
       <div class="dp-row"><span class="dp-key">R1 complete</span><span class="dp-val">${u.r1_complete ? 'Yes' : 'No'}</span></div>
+      <div class="dp-row"><span class="dp-key">In pool</span><span class="dp-val">${u.matching_pool ? 'Yes' : 'No'}</span></div>
       <div class="dp-row"><span class="dp-key">Subscription</span><span class="dp-val">${u.subscription_tier||'free'}</span></div>
       <div class="dp-row"><span class="dp-key">Joined</span><span class="dp-val">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</span></div>
+
       <div class="dp-section-lbl">Match History (${(data.matches||[]).length})</div>
-      ${(data.matches||[]).slice(0,3).map(m=>`
-        <div class="dp-row"><span class="dp-key">${m.partner_name||'Match'}</span><span class="dp-val">${m.r1_score||0}% · ${m.status}</span></div>`).join('') || '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:6px 0">No matches yet</div>'}
+      ${(data.matches||[]).map(m=>`
+        <div class="dp-row"><span class="dp-key">${m.partner_name||'Match'}</span><span class="dp-val">${m.combined_score ? m.combined_score+'% final' : (m.r1_score||0)+'% R1'} · ${m.status.replace(/_/g,' ')}</span></div>`).join('') || '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:6px 0">No matches yet</div>'}
+
       <div class="dp-section-lbl">Payments (${(data.payments||[]).length})</div>
-      ${(data.payments||[]).slice(0,3).map(p=>`
+      ${(data.payments||[]).map(p=>`
         <div class="dp-row"><span class="dp-key">$${((p.amount||0)/100).toFixed(2)}</span><span class="dp-val">${p.status} · ${p.payment_type?.replace(/_/g,' ')}</span></div>`).join('') || '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:6px 0">No payments</div>'}
+
       <div class="dp-actions">
         ${u.status === 'suspended'
           ? `<button class="btn-sm btn-outline" onclick="reinstateUser('${userId}','${u.first_name}');closeDetail()" style="padding:9px">Restore Account</button>`
