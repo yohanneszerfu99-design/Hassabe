@@ -536,7 +536,7 @@ async function loadUsers() {
       <tr>
         <td><div class="td-name">${u.first_name||''} ${u.last_name||''}</div><div class="td-sub">${u.email}</div></td>
         <td>${u.city||'—'}</td>
-        <td style="font-size:11.5px;color:rgba(232,213,163,.45)">${(u.religion||'—').replace(/_/g,' ')}</td>
+        <td style="font-size:11.5px;color:rgba(232,213,163,.45)">${dp(u.religion)}</td>
         <td style="font-family:'Cormorant Garamond',serif;font-size:15px;color:#C9A84C">${u.profile_score||0}</td>
         <td><span class="pill ${stageColor[u.status==='suspended'?'suspended':u.matching_pool?'in_pool':u.r1_complete?'r1_complete':'profile']||'pill-grey'}">${u.status==='suspended'?'suspended':u.matching_pool?'in pool':u.r1_complete?'R1 done':'profile'}</span></td>
         <td style="color:rgba(232,213,163,.32)">${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
@@ -556,6 +556,13 @@ async function loadUsers() {
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="7" class="err-row">Error: ${e.message}</td></tr>`;
   }
+}
+
+// Helper: safely convert any value (string, array, null) to display text
+function dp(val, fallback = '—') {
+  if (val == null || val === '') return fallback;
+  if (Array.isArray(val)) return val.join(', ') || fallback;
+  return String(val).replace(/_/g, ' ');
 }
 
 async function openUserDetail(userId) {
@@ -598,19 +605,19 @@ async function openUserDetail(userId) {
       <div class="dp-row"><span class="dp-key">Age</span><span class="dp-val">${age}</span></div>
       <div class="dp-row"><span class="dp-key">City</span><span class="dp-val">${u.city||'—'}${u.country ? ', '+u.country : ''}</span></div>
       <div class="dp-row"><span class="dp-key">Profession</span><span class="dp-val">${u.profession||'—'}</span></div>
-      <div class="dp-row"><span class="dp-key">Education</span><span class="dp-val">${(u.education_level||'—').replace(/_/g,' ')}</span></div>
-      <div class="dp-row"><span class="dp-key">Ethnicity</span><span class="dp-val">${(u.ethnicity||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Education</span><span class="dp-val">${dp(u.education_level)}</span></div>
+      <div class="dp-row"><span class="dp-key">Ethnicity</span><span class="dp-val">${dp(u.ethnicity)}</span></div>
       <div class="dp-row"><span class="dp-key">Languages</span><span class="dp-val">${langsHTML}</span></div>
 
       <div class="dp-section-lbl">Faith & Values</div>
-      <div class="dp-row"><span class="dp-key">Religion</span><span class="dp-val">${(u.religion||'—').replace(/_/g,' ')}</span></div>
-      <div class="dp-row"><span class="dp-key">Practice level</span><span class="dp-val">${(u.practice_level||'—').replace(/_/g,' ')}</span></div>
-      <div class="dp-row"><span class="dp-key">Heritage strength</span><span class="dp-val">${(u.heritage_strength||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Religion</span><span class="dp-val">${dp(u.religion)}</span></div>
+      <div class="dp-row"><span class="dp-key">Practice level</span><span class="dp-val">${dp(u.practice_level)}</span></div>
+      <div class="dp-row"><span class="dp-key">Heritage strength</span><span class="dp-val">${dp(u.heritage_strength)}</span></div>
 
       <div class="dp-section-lbl">Relationship</div>
-      <div class="dp-row"><span class="dp-key">Goal</span><span class="dp-val">${(u.relationship_goal||'—').replace(/_/g,' ')}</span></div>
-      <div class="dp-row"><span class="dp-key">Children</span><span class="dp-val">${(u.children_preference||'—').replace(/_/g,' ')}</span></div>
-      <div class="dp-row"><span class="dp-key">Relocation</span><span class="dp-val">${(u.open_to_relocation||'—').replace(/_/g,' ')}</span></div>
+      <div class="dp-row"><span class="dp-key">Goal</span><span class="dp-val">${dp(u.relationship_goal)}</span></div>
+      <div class="dp-row"><span class="dp-key">Children</span><span class="dp-val">${dp(u.children_preference)}</span></div>
+      <div class="dp-row"><span class="dp-key">Relocation</span><span class="dp-val">${dp(u.open_to_relocation)}</span></div>
       <div class="dp-row"><span class="dp-key">Seeking</span><span class="dp-val">${(u.seeking||'—')}</span></div>
       <div class="dp-row"><span class="dp-key">Age range</span><span class="dp-val">${u.partner_age_min||18}–${u.partner_age_max||99}</span></div>
 
@@ -630,7 +637,7 @@ async function openUserDetail(userId) {
 
       <div class="dp-section-lbl">Match History (${(data.matches||[]).length})</div>
       ${(data.matches||[]).map(m=>`
-        <div class="dp-row"><span class="dp-key">${m.partner_name||'Match'}</span><span class="dp-val">${m.combined_score ? m.combined_score+'% final' : (m.r1_score||0)+'% R1'} · ${m.status.replace(/_/g,' ')}</span></div>`).join('') || '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:6px 0">No matches yet</div>'}
+        <div class="dp-row"><span class="dp-key">${m.partner_name||'Match'}</span><span class="dp-val">${m.combined_score ? m.combined_score+'% final' : (m.r1_score||0)+'% R1'} · ${dp(m.status)}</span></div>`).join('') || '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:6px 0">No matches yet</div>'}
 
       <div class="dp-section-lbl">Payments (${(data.payments||[]).length})</div>
       ${(data.payments||[]).map(p=>`
