@@ -81,6 +81,8 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
 .chat-header-sub{font-size:11px;color:#9A8A72;display:flex;align-items:center;gap:6px}
 .chat-header-sub .dot{width:6px;height:6px;border-radius:50%;background:#B5A88C;display:inline-block}
 .chat-header-sub .dot.online{background:#27AE60}
+.unlock-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(201,168,76,0.10);border:1px solid rgba(201,168,76,0.25);border-radius:20px;padding:3px 10px;font-size:10px;letter-spacing:.03em;color:#8B6914;margin-top:3px}
+.unlock-badge svg{width:12px;height:12px;fill:#C9A84C}
 
 /* Expiry bar */
 .expiry-bar{
@@ -359,6 +361,10 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
           <span class="dot" id="hdr-dot"></span>
           <span id="hdr-sub">30 · Physician · Toronto</span>
         </div>
+        <div class="unlock-badge" id="hdr-unlock-badge" style="display:none">
+          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+          <span id="unlock-badge-text">They unlocked this for you</span>
+        </div>
       </div>
       <div style="display:flex;gap:4px">
         <button class="icon-btn" onclick="showMatchInfo()" title="Match details">⚙</button>
@@ -620,6 +626,7 @@ function matchToConv(m) {
     score:           m.score || m.r1_score || 0,
     expiresAt:       m.expiresAt,
     icebreakers:     m.icebreakers || [],
+    unlockedBy:      m.unlocked_by_user_id || m.unlockedBy || null,
     lastMessage:     null,
     lastTime:        m.matchedAt,
     unread:          0,
@@ -668,6 +675,18 @@ function openConversation(conv) {
   document.getElementById('hdr-name').textContent = conv.partnerName;
   document.getElementById('hdr-sub').textContent  = conv.partnerSub;
   document.getElementById('hdr-dot').className    = 'dot online';
+
+  // Show "unlocked for you" badge if partner paid
+  const unlockBadge = document.getElementById('hdr-unlock-badge');
+  if (conv.unlockedBy && conv.unlockedBy !== MY_ID) {
+    document.getElementById('unlock-badge-text').textContent = `${conv.partnerName} unlocked this for you`;
+    unlockBadge.style.display = 'inline-flex';
+  } else if (conv.unlockedBy && conv.unlockedBy === MY_ID) {
+    document.getElementById('unlock-badge-text').textContent = 'You unlocked this conversation';
+    unlockBadge.style.display = 'inline-flex';
+  } else {
+    unlockBadge.style.display = 'none';
+  }
 
   // Show chat elements
   document.getElementById('chat-header').style.display = 'flex';
