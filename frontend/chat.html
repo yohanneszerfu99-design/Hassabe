@@ -27,6 +27,13 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
 }
 .conv-header h2{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:#2A1C06}
 .conv-header p{font-size:11px;color:#B5A88C;letter-spacing:.04em;margin-top:2px}
+.conv-nav{padding:12px 18px;border-top:.5px solid rgba(139,105,20,.1);display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.conv-nav a,.conv-nav button{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:6px;font-size:13px;color:#5A4A2E;text-decoration:none;border:none;background:none;cursor:pointer;font-family:'Jost',sans-serif;transition:background .15s;width:100%;text-align:left}
+.conv-nav a:hover,.conv-nav button:hover{background:rgba(139,105,20,.06)}
+.conv-nav .nav-ico{font-size:15px;width:20px;text-align:center}
+.conv-nav .logout-btn{color:#B5481A}
+.back-btn{display:none;width:34px;height:34px;border-radius:50%;border:none;cursor:pointer;background:transparent;font-size:18px;flex-shrink:0;color:#2A1C06;transition:background .15s}
+.back-btn:hover{background:rgba(139,105,20,.07)}
 .conv-items{flex:1;overflow-y:auto}
 .conv-item{
   display:flex;align-items:center;gap:12px;
@@ -319,18 +326,19 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
 
 /* Mobile */
 @media(max-width:700px){
-  .conv-list{display:none}
+  .shell{flex-direction:column}
+  .conv-list{width:100%;height:100dvh;height:100vh;border-right:none}
+  .conv-list.hidden-mobile{display:none}
+  .chat-panel{display:none;height:100dvh;height:100vh}
+  .chat-panel.active-mobile{display:flex}
   .bubble{max-width:calc(100vw - 90px)}
+  .back-btn{display:flex;align-items:center;justify-content:center}
   .input-area{
     padding:10px 12px 14px;
     padding-bottom:max(14px, env(safe-area-inset-bottom));
     position:sticky;
     bottom:0;
     z-index:20;
-  }
-  .chat-panel{
-    height:100dvh;
-    height:100vh;
   }
 }
 </style>
@@ -347,6 +355,12 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
     <div class="conv-items" id="conv-items">
       <!-- Injected by JS -->
     </div>
+    <div class="conv-nav">
+      <a href="matches.html"><span class="nav-ico">◆</span> My Matches</a>
+      <a href="notifications.html"><span class="nav-ico">🔔</span> Notifications</a>
+      <a href="profile.html"><span class="nav-ico">👤</span> Profile</a>
+      <button class="logout-btn" onclick="logout()"><span class="nav-ico">↗</span> Log out</button>
+    </div>
   </div>
 
   <!-- ══ CHAT PANEL ══ -->
@@ -354,6 +368,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
 
     <!-- Header -->
     <div class="chat-header" id="chat-header" style="display:none">
+      <button class="back-btn" onclick="goBackToList()" title="Back">←</button>
       <div class="chat-header-av" id="hdr-av">SR</div>
       <div class="chat-header-info">
         <div class="chat-header-name" id="hdr-name">Sara R.</div>
@@ -443,6 +458,9 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
 
 <!-- Connection status indicator -->
 <div class="conn-status connected" id="conn-status">Reconnecting…</div>
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center">
+  <div id="modal-inner" style="background:#fff;border-radius:8px;max-width:90vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)"></div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -661,6 +679,10 @@ function renderConversationList(convs) {
 function openConversation(conv) {
   if (currentMatch?.matchId === conv.matchId) return;
   currentMatch = conv;
+
+  // Mobile: hide conv list, show chat panel
+  document.querySelector('.conv-list').classList.add('hidden-mobile');
+  document.getElementById('chat-panel').classList.add('active-mobile');
 
   // Highlight in sidebar
   document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
@@ -1111,7 +1133,44 @@ function updateConvPreview(msg) {
   if (time) time.textContent = formatTime(msg.sentAt);
 }
 
-function showMatchInfo() { toast('Match details — see match dashboard for full info'); }
+function showMatchInfo() {
+  if (!currentMatch) return;
+  const c = currentMatch;
+  const daysLeft = c.expiresAt ? Math.max(0, Math.ceil((new Date(c.expiresAt) - Date.now()) / 86400000)) : '—';
+  const modal = document.getElementById('modal-bg');
+  document.getElementById('modal-inner').innerHTML = `
+    <div style="padding:24px;max-width:340px">
+      <h2 style="font-family:'Cormorant Garamond',serif;font-size:22px;color:#2A1C06;margin-bottom:16px">Match Details</h2>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:#5A4A2E">
+        <div style="display:flex;justify-content:space-between"><span style="color:#9A8A72">Partner</span><span>${c.partnerName || '—'}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:#9A8A72">Score</span><span style="color:#C9A84C;font-family:'Cormorant Garamond',serif;font-size:18px">${c.score || '—'}%</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:#9A8A72">Days remaining</span><span>${daysLeft}${typeof daysLeft === 'number' ? ' days' : ''}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:#9A8A72">Unlocked</span><span>${c.unlockedBy === MY_ID ? 'By you' : c.unlockedBy ? 'By ' + c.partnerName : '—'}</span></div>
+      </div>
+      ${c.icebreakers?.length ? `
+        <div style="margin-top:16px;padding-top:12px;border-top:.5px solid rgba(139,105,20,.1)">
+          <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#B5A88C;margin-bottom:8px">Icebreakers</div>
+          ${c.icebreakers.map(q => `<div style="font-size:12px;color:#5A4A2E;padding:6px 0;border-bottom:.5px solid rgba(139,105,20,.06)">"${q}"</div>`).join('')}
+        </div>` : ''}
+      <button onclick="closeModal()" style="margin-top:18px;width:100%;padding:10px;border:none;background:#2A1C06;color:#E8D5A3;border-radius:4px;cursor:pointer;font-family:'Jost',sans-serif;font-size:13px">Close</button>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('modal-bg').style.display = 'none';
+}
+
+function goBackToList() {
+  document.querySelector('.conv-list').classList.remove('hidden-mobile');
+  document.getElementById('chat-panel').classList.remove('active-mobile');
+}
+
+function logout() {
+  localStorage.removeItem('hassabe_token');
+  localStorage.removeItem('hassabe_user_id');
+  window.location.href = 'auth.html';
+}
 
 function getDateLabel(iso) {
   if (!iso) return '';
