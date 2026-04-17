@@ -177,6 +177,13 @@ tr:hover td{background:rgba(201,168,76,.03)}
 /* ── TOAST ── */
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:#1A1208;color:#E8D5A3;padding:9px 18px;border-radius:3px;font-size:12.5px;z-index:999;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;border:.5px solid rgba(201,168,76,.2)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.msg-viewer{max-height:60vh;overflow-y:auto;padding:12px 0}
+.msg-bubble{max-width:80%;padding:10px 14px;border-radius:12px;margin:4px 0;font-size:12.5px;line-height:1.5;word-break:break-word}
+.msg-bubble.sent{background:rgba(201,168,76,.12);color:#E8D5A3;margin-left:auto;border-bottom-right-radius:4px}
+.msg-bubble.received{background:rgba(232,213,163,.06);color:rgba(232,213,163,.7);margin-right:auto;border-bottom-left-radius:4px}
+.msg-bubble.flagged{border:1px solid rgba(232,76,76,.3);background:rgba(232,76,76,.06)}
+.msg-meta{font-size:9px;color:rgba(232,213,163,.25);margin-top:2px}
+.msg-flag-tag{display:inline-block;background:rgba(232,76,76,.12);color:rgba(232,76,76,.7);font-size:9px;padding:1px 6px;border-radius:8px;margin-left:6px}
 
 @media(max-width:820px){.sidebar{width:52px;padding:14px 8px}.sb-logo span,.sb-logo:first-child,.sb-tag,.nav-item span:not(.ico),.nav-badge,.sb-footer{display:none}.nav-item{justify-content:center}.detail-panel{width:100vw}}
 </style>
@@ -297,6 +304,12 @@ tr:hover td{background:rgba(201,168,76,.03)}
 
   <!-- MODERATION -->
   <div class="panel" id="panel-moderation">
+    <div class="sec-hdr"><div><h2>Flagged Messages</h2></div></div>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>Sender</th><th>Conversation</th><th>Message</th><th>Reason</th><th>Time</th><th>Actions</th></tr></thead>
+      <tbody id="flagged-body"><tr><td colspan="6" class="loading-row"><div class="spinner"></div></td></tr></tbody>
+      </table>
+    </div>
     <div class="sec-hdr"><div><h2>Open Reports</h2></div></div>
     <div class="tbl-wrap">
       <table><thead><tr><th>Type</th><th>Reporter</th><th>Subject</th><th>Reason</th><th>Time</th><th>Actions</th></tr></thead>
@@ -721,7 +734,10 @@ async function loadConversations() {
         <td>—</td>
         <td><span class="pill ${daysLeft !== '—' && daysLeft <= 3 ? 'pill-red':'pill-gold'}">${daysLeft}${daysLeft !== '—' ? 'd':''}</span></td>
         <td style="color:rgba(232,213,163,.3)">${m.messaging_unlocked_at ? new Date(m.messaging_unlocked_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
-        <td><button class="act-btn act-decline" onclick="closeConversation('${m.id}')">Force Close</button></td>
+        <td><div class="row-actions">
+          <button class="act-btn act-approve" onclick="viewMessages('${m.id}')">View Messages</button>
+          <button class="act-btn act-decline" onclick="closeConversation('${m.id}')">Force Close</button>
+        </div></td>
       </tr>`;
     }).join('');
   } catch (e) { tbody.innerHTML = `<tr><td colspan="6" class="err-row">${e.message}</td></tr>`; }
@@ -730,14 +746,40 @@ async function loadConversations() {
 // ── MODERATION ─────────────────────────────────────────────────
 async function loadModeration() {
   try {
-    const [repRes, usersRes] = await Promise.all([
+    const [repRes, usersRes, flagRes] = await Promise.all([
       api('/api/admin/reports'),
       api('/api/admin/users?status=suspended&limit=20'),
+      api('/api/admin/flagged-messages'),
     ]);
     const repData   = await repRes.json();
     const usersData = await usersRes.json();
+    const flagData  = await flagRes.json();
     const reports   = repData.reports || [];
     const suspended = usersData.users || [];
+    const flagged   = flagData.flagged || [];
+
+    // Flagged messages
+    const ftbody = document.getElementById('flagged-body');
+    ftbody.innerHTML = !flagged.length
+      ? '<tr><td colspan="6" class="empty-row">No flagged messages</td></tr>'
+      : flagged.map(f => `
+          <tr>
+            <td class="td-name">${f.sender_name || '?'}</td>
+            <td><div class="td-sub">${f.name_a||'?'} ↔ ${f.name_b||'?'}</div></td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(232,213,163,.55)">${f.content||'—'}</td>
+            <td><span class="pill pill-red">${(f.flag_reason||'flagged').split(':')[0]}</span></td>
+            <td style="color:rgba(232,213,163,.3)">${f.sent_at ? new Date(f.sent_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
+            <td><div class="row-actions">
+              <button class="act-btn act-approve" onclick="viewMessages('${f.match_id}')">View Chat</button>
+              <button class="act-btn act-approve" onclick="dismissFlag('${f.id}')">Dismiss</button>
+              <button class="act-btn act-decline" onclick="removeMessage('${f.id}')">Remove</button>
+            </div></td>
+          </tr>`).join('');
+
+    // Update badge count
+    const badgeEl = document.getElementById('badge-reports');
+    const totalFlags = flagged.length + reports.length;
+    if (badgeEl) badgeEl.textContent = totalFlags > 0 ? totalFlags : '—';
 
     const tbody = document.getElementById('reports-body');
     tbody.innerHTML = !reports.length
@@ -943,6 +985,65 @@ function overrideMatch(matchId, action, nameA, nameB) {
       { label:'Cancel', cls:'btn-outline', fn: closeModal },
     ],
   });
+}
+
+async function viewMessages(matchId) {
+  const panel = document.getElementById('detail-panel');
+  document.getElementById('detail-content').innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading messages…</div>';
+  panel.classList.add('open');
+  try {
+    const res  = await api(`/api/admin/conversations/${matchId}/messages`);
+    const data = await res.json();
+    const match = data.match || {};
+    const msgs  = data.messages || [];
+
+    document.getElementById('detail-content').innerHTML = `
+      <div class="dp-name">${match.name_a || '?'} ↔ ${match.name_b || '?'}</div>
+      <div class="dp-email">${data.count} messages · ${data.flaggedCount} flagged</div>
+
+      <div class="dp-section-lbl">Conversation</div>
+      <div class="msg-viewer">
+        ${msgs.length === 0 ? '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:12px 0">No messages yet</div>' :
+          msgs.map(m => {
+            const isFlagged = m.is_flagged;
+            const side = m.sender_id === match.user_a_id ? 'received' : 'sent';
+            return `<div class="msg-bubble ${side} ${isFlagged ? 'flagged' : ''}">
+              <div style="font-size:9px;color:rgba(201,168,76,.4);margin-bottom:3px">${m.sender_name || '?'}</div>
+              ${m.content || '<i style="color:rgba(232,213,163,.25)">[no content]</i>'}
+              ${isFlagged ? '<span class="msg-flag-tag">⚠ ' + (m.flag_reason || 'flagged') + '</span>' : ''}
+              <div class="msg-meta">${m.sent_at ? new Date(m.sent_at).toLocaleString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+            </div>
+            ${isFlagged ? '<div style="text-align:center;margin:4px 0"><button class="act-btn act-approve" style="font-size:10px;padding:3px 8px" onclick="dismissFlag(\'' + m.id + '\')">Dismiss</button> <button class="act-btn act-decline" style="font-size:10px;padding:3px 8px" onclick="removeMessage(\'' + m.id + '\')">Remove</button></div>' : ''}`;
+          }).join('')}
+      </div>
+
+      <div class="dp-actions">
+        <button class="btn-sm btn-outline" onclick="closeDetail()" style="padding:9px">Close</button>
+      </div>`;
+
+    // Scroll to bottom of messages
+    const viewer = panel.querySelector('.msg-viewer');
+    if (viewer) viewer.scrollTop = viewer.scrollHeight;
+  } catch (e) {
+    document.getElementById('detail-content').innerHTML = '<div class="err-row">Failed to load: ' + e.message + '</div>';
+  }
+}
+
+async function dismissFlag(msgId) {
+  try {
+    await api('/api/admin/messages/' + msgId + '/dismiss', { method: 'PUT' });
+    toast('Flag dismissed');
+    loadModeration();
+  } catch { toast('Failed to dismiss flag'); }
+}
+
+async function removeMessage(msgId) {
+  if (!confirm('Remove this message? The user will see "[Removed by admin]".')) return;
+  try {
+    await api('/api/admin/messages/' + msgId, { method: 'DELETE' });
+    toast('Message removed');
+    loadModeration();
+  } catch { toast('Failed to remove message'); }
 }
 
 async function closeConversation(matchId) {
