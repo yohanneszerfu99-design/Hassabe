@@ -91,6 +91,7 @@ router.get('/', requireAuth, matchLimiter, async (req, res) => {
         m.icebreakers,
         m.r2_expires_at,
         m.messaging_unlocked_at,
+        m.unlocked_by_user_id,
         m.expires_at,
         m.created_at,
 
@@ -147,6 +148,7 @@ router.get('/', requireAuth, matchLimiter, async (req, res) => {
       icebreakers:         m.status === 'messaging_unlocked' ? m.icebreakers : [],
       r2ExpiresAt:         m.r2_expires_at,
       messagingUnlockedAt: m.messaging_unlocked_at,
+      unlockedBy:          m.unlocked_by_user_id,
       expiresAt:           m.expires_at,
       matchedAt:           m.created_at,
       myR2Complete:        !!m.my_r2_completed_at,
@@ -231,6 +233,7 @@ router.get('/:id',
           frictionPoints:       null, // never exposed to users
           r2ExpiresAt:          m.r2_expires_at,
           messagingUnlockedAt:  m.messaging_unlocked_at,
+          unlockedBy:           m.unlocked_by_user_id,
           expiresAt:            m.expires_at,
           matchedAt:            m.created_at,
           myR2Complete,
