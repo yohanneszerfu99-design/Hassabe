@@ -344,11 +344,12 @@ async function handleCheckoutCompleted(session) {
           status                = 'messaging_unlocked',
           payment_id            = (SELECT id FROM payments WHERE stripe_session_id = $1),
           messaging_unlocked_at = now(),
+          unlocked_by_user_id   = $3,
           expires_at            = now() + interval '30 days',
           updated_at            = now()
         WHERE id = $2 AND status = 'approved'
         RETURNING id, user_a_id, user_b_id
-      `, [session.id, matchId]);
+      `, [session.id, matchId, userId]);
 
       if (!unlockResult.rows[0]) {
         console.warn('[Webhook] Match not found or already unlocked:', matchId);
