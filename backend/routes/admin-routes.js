@@ -1,1078 +1,636 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe Admin</title>
-<script src="/js/config.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;font-family:'Jost',sans-serif;background:#0F0D08;-webkit-font-smoothing:antialiased;color:#E8D5A3}
-.shell{display:flex;height:100vh;overflow:hidden}
+// ═══════════════════════════════════════════════════════════════
+//  HASSABE — Admin API Routes  (Step 10)
+//  File: admin-routes.js
+//
+//  All routes require is_admin = true on the user record.
+//
+//  Routes:
+//  Users
+//   GET  /api/admin/users              — paginated user list
+//   GET  /api/admin/users/:id          — user detail
+//   PUT  /api/admin/users/:id/suspend  — suspend account
+//   PUT  /api/admin/users/:id/reinstate— reinstate account
+//   PUT  /api/admin/users/:id/admin    — toggle admin flag
+//   DELETE /api/admin/users/:id        — hard delete (GDPR)
+//
+//  Matches
+//   GET  /api/admin/matches            — full match queue
+//   GET  /api/admin/matches/:id        — match detail with full AI data
+//   POST /api/admin/matches/:id/override — approve / decline / rescore
+//   POST /api/admin/matches/:id/flag   — flag for review
+//
+//  Moderation
+//   GET  /api/admin/reports            — unreviewed reports
+//   PUT  /api/admin/reports/:id        — resolve report
+//   GET  /api/admin/conversations      — active conversations
+//   POST /api/admin/conversations/:id/close — force-close
+//
+//  Revenue
+//   GET  /api/admin/revenue/summary    — totals and breakdown
+//   GET  /api/admin/revenue/payments   — payment list
+//   POST /api/admin/revenue/refund/:id — process refund
+//
+//  System
+//   GET  /api/admin/stats              — dashboard stats
+//   GET  /api/admin/engine/runs        — engine run history
+//   POST /api/admin/engine/run         — trigger engine
+//   GET  /api/admin/audit              — admin action audit log
+// ═══════════════════════════════════════════════════════════════
 
-/* ── SIDEBAR ── */
-.sidebar{width:220px;flex-shrink:0;background:#0C0902;border-right:.5px solid rgba(201,168,76,.1);display:flex;flex-direction:column;padding:24px 16px}
-.sb-logo{font-family:'Cormorant Garamond',serif;font-size:20px;color:#FAF0DC;margin-bottom:2px}
-.sb-logo span{color:#C9A84C}
-.sb-tag{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:rgba(201,168,76,.3);margin-bottom:28px}
-.sb-section{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(201,168,76,.25);margin:14px 0 5px 6px}
-.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:5px;font-size:12.5px;color:rgba(232,213,163,.4);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left;font-family:'Jost',sans-serif;margin-bottom:2px}
-.nav-item:hover{background:rgba(201,168,76,.07);color:rgba(232,213,163,.75)}
-.nav-item.active{background:rgba(201,168,76,.12);color:#E8D5A3;font-weight:500}
-.nav-item .ico{font-size:14px;width:18px;text-align:center}
-.nav-badge{margin-left:auto;background:rgba(201,168,76,.2);color:rgba(201,168,76,.9);border-radius:8px;padding:1px 7px;font-size:10px;font-weight:600}
-.nav-badge.red{background:rgba(180,50,50,.3);color:#FF8080}
-.sb-footer{margin-top:auto;padding-top:14px;border-top:.5px solid rgba(201,168,76,.08);font-size:11px;color:rgba(232,213,163,.4)}
-.sb-email{font-size:10px;color:rgba(232,213,163,.25);margin-top:2px;word-break:break-all}
+require('dotenv').config();
 
-/* ── MAIN ── */
-.main{flex:1;overflow-y:auto;background:#0F0D08;display:flex;flex-direction:column}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 26px;border-bottom:.5px solid rgba(201,168,76,.08);position:sticky;top:0;background:#0F0D08;z-index:10}
-.topbar h1{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:#FAF0DC}
-.topbar-right{display:flex;gap:10px;align-items:center}
-.topbar-time{font-size:11px;color:rgba(201,168,76,.3)}
-.btn-sm{padding:6px 14px;border-radius:3px;font-size:11.5px;font-weight:500;font-family:'Jost',sans-serif;cursor:pointer;border:none;transition:all .18s;letter-spacing:.03em}
-.btn-gold{background:#C9A84C;color:#0C0902}
-.btn-gold:hover{background:#E8D5A3}
-.btn-outline{background:transparent;color:rgba(232,213,163,.6);border:.5px solid rgba(201,168,76,.25)}
-.btn-outline:hover{background:rgba(201,168,76,.07)}
-.btn-danger{background:rgba(180,50,50,.2);color:#FF8080;border:.5px solid rgba(180,50,50,.3)}
+const express  = require('express');
+const { Pool } = require('pg');
+const Stripe   = require('stripe');
+const jwt      = require('jsonwebtoken');
+const { body, param, query, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 
-/* ── PANELS ── */
-.panel{display:none;padding:22px 26px 60px;animation:fadeIn .2s ease}
-.panel.active{display:block}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+const { runMatchingEngine } = require('../matching-engine');
+const { notify }            = require('../notification-service');
 
-/* ── LOADING / EMPTY ── */
-.loading-row{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px;color:rgba(232,213,163,.3);font-size:13px}
-.spinner{width:18px;height:18px;border:2px solid rgba(201,168,76,.2);border-top-color:#C9A84C;border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.empty-row{text-align:center;padding:32px;color:rgba(232,213,163,.25);font-size:13px}
-.err-row{text-align:center;padding:24px;color:rgba(232,76,76,.6);font-size:13px}
+const router = express.Router();
+const pool   = new Pool({ connectionString: process.env.DATABASE_URL });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
 
-/* ── STAT CARDS ── */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:22px}
-.stat-card{background:rgba(255,255,255,.03);border:.5px solid rgba(201,168,76,.1);border-radius:8px;padding:16px 18px}
-.stat-label{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:rgba(201,168,76,.35);margin-bottom:8px}
-.stat-val{font-family:'Cormorant Garamond',serif;font-size:34px;color:#C9A84C;line-height:1}
-.stat-sub{font-size:11px;color:rgba(232,213,163,.28);margin-top:5px}
-.stat-card.green .stat-val{color:#27AE60}
-.stat-card.red .stat-val{color:#E84C4C}
-
-/* ── TABLE ── */
-.tbl-wrap{background:rgba(255,255,255,.02);border:.5px solid rgba(201,168,76,.1);border-radius:8px;overflow:hidden;margin-bottom:22px}
-table{width:100%;border-collapse:collapse}
-th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(201,168,76,.32);padding:9px 13px;border-bottom:.5px solid rgba(201,168,76,.1);font-weight:500;background:rgba(0,0,0,.12)}
-td{padding:10px 13px;border-bottom:.5px solid rgba(201,168,76,.05);font-size:12.5px;color:rgba(232,213,163,.65);vertical-align:middle}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(201,168,76,.03)}
-.td-name{color:rgba(232,213,163,.88);font-weight:500}
-.td-sub{font-size:11px;color:rgba(232,213,163,.3);margin-top:1px}
-
-/* ── PILLS ── */
-.pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
-.pill-green{background:rgba(39,174,96,.12);color:rgba(39,174,96,.9)}
-.pill-gold{background:rgba(201,168,76,.12);color:rgba(201,168,76,.9)}
-.pill-blue{background:rgba(74,122,200,.12);color:rgba(74,122,200,.9)}
-.pill-red{background:rgba(232,76,76,.1);color:rgba(232,76,76,.8)}
-.pill-grey{background:rgba(255,255,255,.06);color:rgba(232,213,163,.4)}
-
-/* ── FILTERS ── */
-.filter-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.search-in{flex:1;min-width:160px;padding:7px 12px;background:rgba(255,255,255,.04);border:.5px solid rgba(201,168,76,.18);border-radius:4px;color:rgba(232,213,163,.8);font-family:'Jost',sans-serif;font-size:13px;outline:none}
-.search-in::placeholder{color:rgba(232,213,163,.22)}
-.search-in:focus{border-color:rgba(201,168,76,.45)}
-.filter-sel{padding:7px 28px 7px 10px;background:rgba(255,255,255,.04) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23C9A84C' stroke-width='1.4' fill='none'/%3E%3C/svg%3E") no-repeat right 9px center;border:.5px solid rgba(201,168,76,.18);border-radius:4px;color:rgba(232,213,163,.6);font-family:'Jost',sans-serif;font-size:12.5px;appearance:none;outline:none;cursor:pointer}
-.filter-sel option{background:#1A1208}
-
-/* ── ROW ACTIONS ── */
-.row-actions{display:flex;gap:5px}
-.act-btn{padding:4px 9px;border-radius:3px;font-size:10.5px;font-weight:500;font-family:'Jost',sans-serif;cursor:pointer;border:.5px solid;transition:all .15s;white-space:nowrap}
-.act-view{color:rgba(232,213,163,.5);border-color:rgba(201,168,76,.2);background:transparent}
-.act-view:hover{background:rgba(201,168,76,.08);color:rgba(232,213,163,.85)}
-.act-approve{color:rgba(39,174,96,.8);border-color:rgba(39,174,96,.3);background:rgba(39,174,96,.06)}
-.act-approve:hover{background:rgba(39,174,96,.14)}
-.act-decline{color:rgba(232,76,76,.8);border-color:rgba(232,76,76,.25);background:rgba(232,76,76,.05)}
-.act-decline:hover{background:rgba(232,76,76,.12)}
-.act-warn{color:rgba(245,166,35,.8);border-color:rgba(245,166,35,.25);background:transparent}
-
-/* ── SECTION HEADER ── */
-.sec-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px}
-.sec-hdr h2{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:400;color:#FAF0DC}
-.sec-hdr p{font-size:12px;color:rgba(232,213,163,.32);margin-top:2px}
-
-/* ── REVENUE CHART ── */
-.rev-chart{display:flex;align-items:flex-end;gap:5px;height:60px;padding:0 2px;margin:10px 0 4px}
-.rev-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
-.rev-bar{width:100%;border-radius:3px 3px 0 0;background:linear-gradient(180deg,rgba(201,168,76,.65),rgba(201,168,76,.22));min-height:3px;cursor:pointer;transition:opacity .15s;position:relative}
-.rev-bar:hover{opacity:.7}
-.rev-tip{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:#1A1208;color:#C9A84C;font-size:10px;padding:3px 7px;border-radius:3px;white-space:nowrap;border:.5px solid rgba(201,168,76,.2);pointer-events:none;display:none}
-.rev-bar:hover .rev-tip{display:block}
-.rev-lbl{font-size:9px;color:rgba(201,168,76,.3);text-align:center}
-.rev-row{display:flex;justify-content:space-between;margin-top:2px}
-
-/* ── FUNNEL ── */
-.funnel{display:flex;flex-direction:column;gap:6px;margin:8px 0}
-.funnel-row{display:flex;align-items:center;gap:10px}
-.funnel-lbl{font-size:11.5px;color:rgba(232,213,163,.45);width:130px;flex-shrink:0;text-align:right}
-.funnel-track{flex:1;height:7px;background:rgba(201,168,76,.08);border-radius:4px;overflow:hidden}
-.funnel-fill{height:100%;background:linear-gradient(90deg,#8B6914,#C9A84C);border-radius:4px;transition:width 1s ease}
-.funnel-num{font-family:'Cormorant Garamond',serif;font-size:14px;color:rgba(201,168,76,.7);width:32px;text-align:right;flex-shrink:0}
-
-/* ── BROADCAST ── */
-.bc-wrap{max-width:540px}
-.seg-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.seg-card{padding:12px 14px;border-radius:6px;border:.5px solid rgba(201,168,76,.14);background:rgba(255,255,255,.02);cursor:pointer;transition:all .15s}
-.seg-card:hover{border-color:rgba(201,168,76,.3);background:rgba(201,168,76,.05)}
-.seg-card.on{border-color:#C9A84C;background:rgba(201,168,76,.1)}
-.seg-title{font-size:13px;font-weight:500;color:rgba(232,213,163,.75)}
-.seg-count{font-size:11px;color:rgba(201,168,76,.45);margin-top:2px}
-.ch-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
-.ch-btn{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:4px;border:.5px solid rgba(201,168,76,.18);background:transparent;color:rgba(232,213,163,.45);font-family:'Jost',sans-serif;font-size:12.5px;cursor:pointer;transition:all .15s}
-.ch-btn.on{background:rgba(201,168,76,.12);border-color:rgba(201,168,76,.4);color:rgba(232,213,163,.9)}
-.bc-input,.bc-textarea{width:100%;padding:9px 12px;background:rgba(255,255,255,.04);border:.5px solid rgba(201,168,76,.2);border-radius:4px;color:rgba(232,213,163,.8);font-family:'Jost',sans-serif;font-size:13px;outline:none;margin-bottom:12px}
-.bc-textarea{min-height:80px;resize:vertical;line-height:1.55}
-.bc-input::placeholder,.bc-textarea::placeholder{color:rgba(232,213,163,.2)}
-.bc-input:focus,.bc-textarea:focus{border-color:rgba(201,168,76,.5)}
-.bc-preview{background:rgba(0,0,0,.2);border:.5px solid rgba(201,168,76,.1);border-radius:5px;padding:12px 14px;font-size:13px;color:rgba(232,213,163,.5);line-height:1.65;min-height:48px;margin-bottom:14px;font-style:italic}
-
-/* ── MODAL ── */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
-.modal-bg.open{opacity:1;pointer-events:all}
-.modal{background:#14110A;border:.5px solid rgba(201,168,76,.2);border-radius:10px;padding:26px;width:460px;max-width:92vw;max-height:80vh;overflow-y:auto;transform:translateY(8px);transition:transform .2s}
-.modal-bg.open .modal{transform:translateY(0)}
-.modal h3{font-family:'Cormorant Garamond',serif;font-size:21px;color:#FAF0DC;margin-bottom:6px}
-.modal p{font-size:13px;color:rgba(232,213,163,.4);line-height:1.7;margin-bottom:16px}
-.modal-field{margin-bottom:12px}
-.modal-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(201,168,76,.4);margin-bottom:6px;display:block}
-.modal-in,.modal-sel,.modal-ta{width:100%;padding:8px 11px;background:rgba(255,255,255,.04);border:.5px solid rgba(201,168,76,.2);border-radius:4px;color:rgba(232,213,163,.8);font-family:'Jost',sans-serif;font-size:13px;outline:none}
-.modal-ta{min-height:72px;resize:vertical;line-height:1.5}
-.modal-in::placeholder,.modal-ta::placeholder{color:rgba(232,213,163,.2)}
-.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:.5px solid rgba(201,168,76,.1)}
-
-/* ── DETAIL PANEL ── */
-.detail-panel{position:fixed;right:0;top:0;bottom:0;width:380px;background:#14110A;border-left:.5px solid rgba(201,168,76,.15);z-index:50;overflow-y:auto;padding:24px;transform:translateX(100%);transition:transform .28s ease}
-.detail-panel.open{transform:translateX(0)}
-.dp-close{font-size:16px;color:rgba(232,213,163,.35);cursor:pointer;background:none;border:none;margin-bottom:18px;display:block;font-family:'Jost',sans-serif;transition:color .2s}
-.dp-close:hover{color:rgba(232,213,163,.7)}
-.dp-av{width:52px;height:52px;border-radius:50%;background:rgba(201,168,76,.15);border:1.5px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:19px;color:#C9A84C;margin-bottom:10px}
-.dp-name{font-family:'Cormorant Garamond',serif;font-size:20px;color:#FAF0DC;margin-bottom:2px}
-.dp-email{font-size:12px;color:rgba(232,213,163,.35);margin-bottom:14px}
-.dp-section-lbl{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:rgba(201,168,76,.28);margin:14px 0 7px}
-.dp-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:.5px solid rgba(201,168,76,.06);font-size:12.5px}
-.dp-row:last-child{border-bottom:none}
-.dp-key{color:rgba(232,213,163,.38)}
-.dp-val{color:rgba(232,213,163,.72)}
-.dp-actions{display:flex;flex-direction:column;gap:7px;margin-top:18px}
-.dp-bio{font-size:12px;color:rgba(232,213,163,.55);line-height:1.6;padding:8px 0;font-style:italic;border-left:2px solid rgba(201,168,76,.15);padding-left:10px;margin:4px 0}
-.dp-dim-bar{display:flex;align-items:center;gap:8px;padding:4px 0}
-.dp-dim-label{font-size:10px;color:rgba(232,213,163,.38);width:80px;text-transform:capitalize}
-.dp-dim-track{flex:1;height:6px;background:rgba(201,168,76,.08);border-radius:3px;overflow:hidden}
-.dp-dim-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,rgba(201,168,76,.3),#C9A84C);transition:width .4s ease}
-.dp-dim-val{font-size:10px;color:rgba(232,213,163,.5);width:28px;text-align:right}
-.dp-narrative{font-size:11.5px;color:rgba(232,213,163,.45);line-height:1.65;padding:8px 0;max-height:120px;overflow-y:auto}
-.dp-tag{display:inline-block;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.15);border-radius:12px;padding:2px 8px;font-size:10px;color:rgba(201,168,76,.6);margin:2px}
-
-/* ── TOAST ── */
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:#1A1208;color:#E8D5A3;padding:9px 18px;border-radius:3px;font-size:12.5px;z-index:999;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;border:.5px solid rgba(201,168,76,.2)}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-@media(max-width:820px){.sidebar{width:52px;padding:14px 8px}.sb-logo span,.sb-logo:first-child,.sb-tag,.nav-item span:not(.ico),.nav-badge,.sb-footer{display:none}.nav-item{justify-content:center}.detail-panel{width:100vw}}
-</style>
-</head>
-<body>
-<div class="shell">
-
-<!-- ── SIDEBAR ── -->
-<aside class="sidebar">
-  <div class="sb-logo" style="margin-bottom:4px"><img src="/assets/logo.png" alt="Hassabe" style="height:40px;width:auto;vertical-align:middle"></div>
-  <div class="sb-tag">Admin</div>
-
-  <div class="sb-section">Overview</div>
-  <button class="nav-item active" onclick="nav('overview',this)"><span class="ico">◈</span><span>Dashboard</span></button>
-
-  <div class="sb-section">People</div>
-  <button class="nav-item" onclick="nav('users',this)"><span class="ico">👤</span><span>All Users</span><span class="nav-badge" id="badge-users">—</span></button>
-  <button class="nav-item" onclick="nav('pending',this)"><span class="ico">⏳</span><span>Pending</span></button>
-
-  <div class="sb-section">Matching</div>
-  <button class="nav-item" onclick="nav('matches',this)"><span class="ico">✦</span><span>Match Queue</span><span class="nav-badge red" id="badge-flagged">—</span></button>
-  <button class="nav-item" onclick="nav('conversations',this)"><span class="ico">💬</span><span>Conversations</span></button>
-
-  <div class="sb-section">Ops</div>
-  <button class="nav-item" onclick="nav('moderation',this)"><span class="ico">🛡</span><span>Moderation</span><span class="nav-badge red" id="badge-reports">—</span></button>
-  <button class="nav-item" onclick="nav('revenue',this)"><span class="ico">$</span><span>Revenue</span></button>
-  <button class="nav-item" onclick="nav('engine',this)"><span class="ico">⚙</span><span>AI Engine</span></button>
-  <button class="nav-item" onclick="nav('broadcast',this)"><span class="ico">📡</span><span>Broadcast</span></button>
-
-  <div class="sb-footer">
-    <div id="sb-name">Admin</div>
-    <div class="sb-email" id="sb-email">—</div>
-  </div>
-</aside>
-
-<!-- ── MAIN ── -->
-<div class="main">
-  <div class="topbar">
-    <h1 id="page-title">Dashboard</h1>
-    <div class="topbar-right">
-      <span class="topbar-time" id="topbar-time"></span>
-      <button class="btn-sm btn-outline" onclick="refreshCurrent()">↻ Refresh</button>
-      <button class="btn-sm btn-gold" onclick="openRunEngine()">▶ Run Engine</button>
-    </div>
-  </div>
-
-  <!-- OVERVIEW -->
-  <div class="panel active" id="panel-overview">
-    <div class="stat-grid" id="stat-grid"><div class="loading-row"><div class="spinner"></div> Loading stats…</div></div>
-    <div class="sec-hdr"><div><h2>Revenue — last 8 months</h2></div></div>
-    <div class="tbl-wrap" style="padding:14px 18px">
-      <div class="rev-chart" id="rev-chart"><div class="loading-row"><div class="spinner"></div></div></div>
-      <div class="rev-row" id="rev-labels"></div>
-    </div>
-    <div class="sec-hdr"><div><h2>Matching Funnel</h2></div></div>
-    <div class="tbl-wrap" style="padding:16px 18px"><div class="funnel" id="funnel-chart"></div></div>
-    <div class="sec-hdr"><div><h2>Recent Engine Runs</h2></div></div>
-    <div class="tbl-wrap">
-      <table><thead><tr><th>Started</th><th>Mode</th><th>Users</th><th>Matches Created</th><th>Duration</th><th>Status</th></tr></thead>
-      <tbody id="runs-body"><tr><td colspan="6" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- USERS -->
-  <div class="panel" id="panel-users">
-    <div class="filter-bar">
-      <input class="search-in" id="user-search" placeholder="Search name, email, city…" oninput="debounce(loadUsers,400)()">
-      <select class="filter-sel" id="user-status-filter" onchange="loadUsers()">
-        <option value="">All statuses</option><option value="active">Active</option><option value="suspended">Suspended</option>
-      </select>
-    </div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr><th>User</th><th>City</th><th>Religion</th><th>Score</th><th>Stage</th><th>Joined</th><th>Actions</th></tr></thead>
-        <tbody id="users-body"><tr><td colspan="7" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-    <div id="users-pagination" style="display:flex;gap:8px;justify-content:center;padding:8px 0"></div>
-  </div>
-
-  <!-- PENDING -->
-  <div class="panel" id="panel-pending">
-    <div class="sec-hdr"><div><h2>Profiles Awaiting Pool Entry</h2><p>Completed profile but score &lt; 70, or manually held</p></div></div>
-    <div class="tbl-wrap">
-      <table><thead><tr><th>User</th><th>Score</th><th>City</th><th>Joined</th><th>Actions</th></tr></thead>
-      <tbody id="pending-body"><tr><td colspan="5" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- MATCHES -->
-  <div class="panel" id="panel-matches">
-    <div class="filter-bar">
-      <select class="filter-sel" id="match-filter" onchange="loadMatches()">
-        <option value="">All statuses</option>
-        <option value="notified">Notified</option><option value="pending_r2">Pending R2</option>
-        <option value="scoring_r2">Scoring R2</option><option value="approved">Approved</option>
-        <option value="messaging_unlocked">Unlocked</option><option value="declined">Declined</option>
-        <option value="flagged">Flagged 🚨</option>
-      </select>
-    </div>
-    <div class="tbl-wrap">
-      <table><thead><tr><th>Pair</th><th>R1</th><th>Final</th><th>Status</th><th>R2</th><th>Created</th><th>Actions</th></tr></thead>
-      <tbody id="matches-body"><tr><td colspan="7" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- CONVERSATIONS -->
-  <div class="panel" id="panel-conversations">
-    <div class="tbl-wrap">
-      <table><thead><tr><th>Pair</th><th>Score</th><th>Messages</th><th>Days Left</th><th>Unlocked</th><th>Actions</th></tr></thead>
-      <tbody id="convs-body"><tr><td colspan="6" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- MODERATION -->
-  <div class="panel" id="panel-moderation">
-    <div class="sec-hdr"><div><h2>Open Reports</h2></div></div>
-    <div class="tbl-wrap">
-      <table><thead><tr><th>Type</th><th>Reporter</th><th>Subject</th><th>Reason</th><th>Time</th><th>Actions</th></tr></thead>
-      <tbody id="reports-body"><tr><td colspan="6" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-    <div class="sec-hdr"><div><h2>Suspended Accounts</h2></div></div>
-    <div class="tbl-wrap">
-      <table><thead><tr><th>User</th><th>Email</th><th>Suspended</th><th>Actions</th></tr></thead>
-      <tbody id="suspended-body"><tr><td colspan="4" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- REVENUE -->
-  <div class="panel" id="panel-revenue">
-    <div class="stat-grid" id="rev-stats"></div>
-    <div class="sec-hdr"><div><h2>Payment History</h2></div></div>
-    <div class="tbl-wrap">
-      <table><thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-      <tbody id="revenue-body"><tr><td colspan="6" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ENGINE -->
-  <div class="panel" id="panel-engine">
-    <div class="stat-grid" id="engine-stats"></div>
-    <div class="sec-hdr"><div><h2>Engine Controls</h2></div></div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px">
-      <button class="btn-sm btn-gold" onclick="openRunEngine()" style="padding:11px 20px">▶ Run Live Match</button>
-      <button class="btn-sm btn-outline" onclick="runEngine(true)" style="padding:11px 20px">◌ Dry Run</button>
-    </div>
-    <div class="sec-hdr"><div><h2>Run History</h2></div></div>
-    <div class="tbl-wrap">
-      <table><thead><tr><th>Started</th><th>Mode</th><th>Users</th><th>Matches</th><th>Duration</th><th>Status</th></tr></thead>
-      <tbody id="engine-body"><tr><td colspan="6" class="loading-row"><div class="spinner"></div></td></tr></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- BROADCAST -->
-  <div class="panel" id="panel-broadcast">
-    <div class="bc-wrap">
-      <div class="sec-hdr"><div><h2>Send Broadcast</h2><p>Push + email to a user segment</p></div></div>
-      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(201,168,76,.35);margin-bottom:8px">Audience</div>
-      <div class="seg-grid" id="seg-grid"></div>
-      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(201,168,76,.35);margin-bottom:7px">Channels</div>
-      <div class="ch-row" id="ch-row"></div>
-      <input class="bc-input" id="bc-title" placeholder="Notification title…" oninput="updatePreview()">
-      <textarea class="bc-textarea" id="bc-body" placeholder="Message body…" oninput="updatePreview()"></textarea>
-      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(201,168,76,.35);margin-bottom:6px">Preview</div>
-      <div class="bc-preview" id="bc-preview"></div>
-      <div style="display:flex;gap:10px">
-        <button class="btn-sm btn-gold" onclick="sendBroadcast()" style="padding:10px 20px">Send Broadcast</button>
-        <button class="btn-sm btn-outline" onclick="clearBroadcast()" style="padding:10px 16px">Clear</button>
-      </div>
-      <div id="bc-result" style="margin-top:12px;font-size:13px;color:rgba(39,174,96,.8)"></div>
-    </div>
-  </div>
-
-</div><!-- /main -->
-</div><!-- /shell -->
-
-<!-- USER DETAIL PANEL -->
-<div class="detail-panel" id="detail-panel">
-  <button class="dp-close" onclick="closeDetail()">✕ Close</button>
-  <div id="detail-content"></div>
-</div>
-
-<!-- MODAL -->
-<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
-  <div class="modal" id="modal-inner"></div>
-</div>
-
-<div id="toast"></div>
-
-<script>
-'use strict';
-const { API } = window.HASSABE_CONFIG;
-let currentPanel = 'overview';
-let usersPage    = 1;
-let bcSegment    = 'all';
-let bcChannels   = ['push', 'email', 'in_app'];
-
-// ── INIT ──────────────────────────────────────────────────────
-(async function init() {
-  if (!window.Auth.requireAdmin('/auth.html')) return;
-
-  updateClock();
-  setInterval(updateClock, 60000);
-
-  // Load admin identity
+// ── Admin auth middleware ──────────────────────────────────────
+async function requireAdmin(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authorization required' });
   try {
-    const res = await api('/api/auth/me');
-    const me  = await res.json();
-    document.getElementById('sb-email').textContent = me.email || '';
-  } catch {}
-
-  initBroadcast();
-  loadPanel('overview');
-  loadBadges();
-})();
-
-function updateClock() {
-  document.getElementById('topbar-time').textContent =
-    new Date().toLocaleString('en-GB', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-}
-
-async function loadBadges() {
-  try {
-    const res  = await api('/api/admin/stats');
-    const data = await res.json();
-    document.getElementById('badge-users').textContent   = data.users?.total ?? '—';
-    document.getElementById('badge-flagged').textContent = data.matches?.flagged ?? '—';
-    document.getElementById('badge-reports').textContent = data.openReports ?? '—';
-  } catch {}
-}
-
-// ── NAVIGATION ─────────────────────────────────────────────────
-const TITLES = { overview:'Dashboard', users:'All Users', pending:'Pending Profiles', matches:'Match Queue', conversations:'Conversations', moderation:'Moderation', revenue:'Revenue', engine:'AI Engine', broadcast:'Broadcast' };
-
-function nav(panel, btn) {
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.getElementById(`panel-${panel}`).classList.add('active');
-  document.getElementById('page-title').textContent = TITLES[panel] || panel;
-  currentPanel = panel;
-  loadPanel(panel);
-}
-
-function refreshCurrent() { loadPanel(currentPanel); toast('Refreshed'); }
-
-function loadPanel(panel) {
-  const map = {
-    overview:      loadOverview,
-    users:         loadUsers,
-    pending:       loadPending,
-    matches:       loadMatches,
-    conversations: loadConversations,
-    moderation:    loadModeration,
-    revenue:       loadRevenue,
-    engine:        loadEngine,
-  };
-  map[panel]?.();
-}
-
-// ── OVERVIEW ───────────────────────────────────────────────────
-async function loadOverview() {
-  try {
-    const [statsRes, revenueRes, runsRes] = await Promise.all([
-      api('/api/admin/stats'),
-      api('/api/admin/revenue/summary'),
-      api('/api/admin/engine/runs'),
-    ]);
-    const stats   = await statsRes.json();
-    const revenue = await revenueRes.json();
-    const runs    = await runsRes.json();
-
-    // Stat cards
-    const s = stats;
-    document.getElementById('stat-grid').innerHTML = [
-      { label:'Total Users',      val: s.users?.total ?? 0,   sub:`${s.users?.active ?? 0} active today` },
-      { label:'In Match Pool',    val: s.users?.inPool ?? 0,  sub:`${s.users?.r1Complete ?? 0} R1 complete` },
-      { label:'Active Matches',   val: s.matches?.active ?? 0, sub:`${s.matches?.total ?? 0} total` },
-      { label:'Conversations',    val: s.matches?.unlocked ?? 0, sub:'messaging unlocked', cls:'green' },
-      { label:'Revenue MTD',      val:`$${((s.revenue?.grossMtd ?? 0)/100).toFixed(0)}`, sub:`$${((s.revenue?.grossAllTime ?? 0)/100).toFixed(0)} all-time` },
-      { label:'Avg Match Score',  val:`${s.matches?.avgR1Score ?? 0}%`, sub:'Round 1 avg' },
-      { label:'Open Reports',     val: s.openReports ?? 0,    sub:'need review', cls:(s.openReports > 0 ? 'red' : '') },
-      { label:'Flagged Matches',  val: s.matches?.flagged ?? 0, sub:'need action', cls:(s.matches?.flagged > 0 ? 'red' : '') },
-    ].map(c => `
-      <div class="stat-card ${c.cls||''}">
-        <div class="stat-label">${c.label}</div>
-        <div class="stat-val">${c.val}</div>
-        <div class="stat-sub">${c.sub}</div>
-      </div>`).join('');
-
-    // Revenue chart
-    const monthly = revenue.monthly || [];
-    const maxRev  = Math.max(...monthly.map(r => r.revenue || 0), 1);
-    document.getElementById('rev-chart').innerHTML = monthly.slice(0,8).map(r => {
-      const h   = Math.max(4, Math.round(((r.revenue||0) / maxRev) * 100));
-      const fmt = r.revenue ? `$${((r.revenue||0)/100).toFixed(0)}` : '$0';
-      return `<div class="rev-bar-wrap">
-        <div class="rev-bar" style="height:${h}%"><div class="rev-tip">${fmt}</div></div>
-        <div class="rev-lbl">${new Date(r.month).toLocaleString('en',{month:'short'})}</div>
-      </div>`;
-    }).join('');
-
-    // Funnel from stats
-    const u = s.users || {}, m = s.matches || {};
-    const funnelData = [
-      { label:'Signed up',     val: u.total || 0 },
-      { label:'R1 complete',   val: u.r1Complete || 0 },
-      { label:'In pool',       val: u.inPool || 0 },
-      { label:'Matched',       val: m.total || 0 },
-      { label:'Both R2 done',  val: m.pendingR2 || 0 },
-      { label:'Approved',      val: (m.unlocked||0) + (m.total||0) - (m.active||0) },
-      { label:'Unlocked',      val: m.unlocked || 0 },
-    ];
-    const maxF = funnelData[0].val || 1;
-    document.getElementById('funnel-chart').innerHTML = funnelData.map(f => `
-      <div class="funnel-row">
-        <div class="funnel-lbl">${f.label}</div>
-        <div class="funnel-track"><div class="funnel-fill" style="width:${Math.round(f.val/maxF*100)}%"></div></div>
-        <div class="funnel-num">${f.val}</div>
-      </div>`).join('');
-
-    // Engine runs
-    renderEngineRunsTable(runs.runs || [], 'runs-body');
-
-  } catch (e) {
-    document.getElementById('stat-grid').innerHTML = `<div class="err-row">Failed to load stats: ${e.message}</div>`;
-  }
-}
-
-// ── USERS ──────────────────────────────────────────────────────
-let debounceTimer;
-function debounce(fn, ms) { return (...a) => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => fn(...a), ms); }; }
-
-async function loadUsers() {
-  const q      = document.getElementById('user-search')?.value || '';
-  const status = document.getElementById('user-status-filter')?.value || '';
-  const tbody  = document.getElementById('users-body');
-  tbody.innerHTML = '<tr><td colspan="7" class="loading-row"><div class="spinner"></div> Loading…</td></tr>';
-
-  try {
-    const res  = await api(`/api/admin/users?page=${usersPage}&limit=25${q?'&q='+encodeURIComponent(q):''}${status?'&status='+status:''}`);
-    const data = await res.json();
-    const rows = data.users || [];
-
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No users found</td></tr>'; return; }
-
-    const stageColor = { matched:'pill-green', in_pool:'pill-gold', r1_complete:'pill-blue', profile:'pill-grey', suspended:'pill-red' };
-    tbody.innerHTML = rows.map(u => `
-      <tr>
-        <td><div class="td-name">${u.first_name||''} ${u.last_name||''}</div><div class="td-sub">${u.email}</div></td>
-        <td>${u.city||'—'}</td>
-        <td style="font-size:11.5px;color:rgba(232,213,163,.45)">${dp(u.religion)}</td>
-        <td style="font-family:'Cormorant Garamond',serif;font-size:15px;color:#C9A84C">${u.profile_score||0}</td>
-        <td><span class="pill ${stageColor[u.status==='suspended'?'suspended':u.matching_pool?'in_pool':u.r1_complete?'r1_complete':'profile']||'pill-grey'}">${u.status==='suspended'?'suspended':u.matching_pool?'in pool':u.r1_complete?'R1 done':'profile'}</span></td>
-        <td style="color:rgba(232,213,163,.32)">${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
-        <td><div class="row-actions">
-          <button class="act-btn act-view" onclick="openUserDetail('${u.id}')">View</button>
-          ${u.status==='suspended'
-            ? `<button class="act-btn act-approve" onclick="reinstateUser('${u.id}','${u.first_name||u.email}')">Restore</button>`
-            : `<button class="act-btn act-decline" onclick="openSuspendModal('${u.id}','${u.first_name||u.email}')">Suspend</button>`}
-        </div></td>
-      </tr>`).join('');
-
-    // Pagination
-    const pages = Math.ceil((data.total||0)/25);
-    const pg = document.getElementById('users-pagination');
-    if (pg) pg.innerHTML = pages > 1 ? Array.from({length:pages},(_,i)=>`
-      <button class="btn-sm ${i+1===usersPage?'btn-gold':'btn-outline'}" onclick="usersPage=${i+1};loadUsers()" style="padding:5px 10px">${i+1}</button>`).join('') : '';
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="7" class="err-row">Error: ${e.message}</td></tr>`;
-  }
-}
-
-// Helper: safely convert any value (string, array, null) to display text
-function dp(val, fallback = '—') {
-  if (val == null || val === '') return fallback;
-  if (Array.isArray(val)) return val.join(', ') || fallback;
-  return String(val).replace(/_/g, ' ');
-}
-
-async function openUserDetail(userId) {
-  const panel = document.getElementById('detail-panel');
-  document.getElementById('detail-content').innerHTML = '<div class="loading-row"><div class="spinner"></div> Loading…</div>';
-  panel.classList.add('open');
-  try {
-    const res  = await api(`/api/admin/users/${userId}`);
-    const data = await res.json();
-    const u    = data.user || {};
-    const initials = ((u.first_name||'?')[0]+(u.last_name||'?')[0]).toUpperCase();
-    const age = u.age || (u.date_of_birth ? Math.floor((Date.now() - new Date(u.date_of_birth).getTime()) / (365.25*24*3600*1000)) : '—');
-
-    // Find R1 questionnaire with dimension scores
-    const r1 = (data.questionnaires||[]).find(q => q.round === 1 && q.status === 'complete');
-    const dimScores = r1?.dimension_scores || {};
-    const narrative = r1?.narrative_text || '';
-    const dimOrder = ['values','culture','faith','family','communication','goals','lifestyle'];
-
-    // Build dimension bars HTML
-    const dimBarsHTML = dimOrder
-      .filter(d => dimScores[d] !== undefined)
-      .map(d => `
-        <div class="dp-dim-bar">
-          <span class="dp-dim-label">${d}</span>
-          <div class="dp-dim-track"><div class="dp-dim-fill" style="width:${dimScores[d]}%"></div></div>
-          <span class="dp-dim-val">${dimScores[d]}</span>
-        </div>`).join('');
-
-    // Languages tags
-    const langs = Array.isArray(u.languages) ? u.languages : [];
-    const langsHTML = langs.length ? langs.map(l => `<span class="dp-tag">${l}</span>`).join('') : '<span style="font-size:11px;color:rgba(232,213,163,.28)">—</span>';
-
-    document.getElementById('detail-content').innerHTML = `
-      <div class="dp-av">${initials}</div>
-      <div class="dp-name">${u.first_name||''} ${u.last_name||''}</div>
-      <div class="dp-email">${u.email||''}</div>
-
-      <div class="dp-section-lbl">Personal</div>
-      <div class="dp-row"><span class="dp-key">Age</span><span class="dp-val">${age}</span></div>
-      <div class="dp-row"><span class="dp-key">City</span><span class="dp-val">${u.city||'—'}${u.country ? ', '+u.country : ''}</span></div>
-      <div class="dp-row"><span class="dp-key">Profession</span><span class="dp-val">${u.profession||'—'}</span></div>
-      <div class="dp-row"><span class="dp-key">Education</span><span class="dp-val">${dp(u.education_level)}</span></div>
-      <div class="dp-row"><span class="dp-key">Ethnicity</span><span class="dp-val">${dp(u.ethnicity)}</span></div>
-      <div class="dp-row"><span class="dp-key">Languages</span><span class="dp-val">${langsHTML}</span></div>
-
-      <div class="dp-section-lbl">Faith & Values</div>
-      <div class="dp-row"><span class="dp-key">Religion</span><span class="dp-val">${dp(u.religion)}</span></div>
-      <div class="dp-row"><span class="dp-key">Practice level</span><span class="dp-val">${dp(u.practice_level)}</span></div>
-      <div class="dp-row"><span class="dp-key">Heritage strength</span><span class="dp-val">${dp(u.heritage_strength)}</span></div>
-
-      <div class="dp-section-lbl">Relationship</div>
-      <div class="dp-row"><span class="dp-key">Goal</span><span class="dp-val">${dp(u.relationship_goal)}</span></div>
-      <div class="dp-row"><span class="dp-key">Children</span><span class="dp-val">${dp(u.children_preference)}</span></div>
-      <div class="dp-row"><span class="dp-key">Relocation</span><span class="dp-val">${dp(u.open_to_relocation)}</span></div>
-      <div class="dp-row"><span class="dp-key">Seeking</span><span class="dp-val">${(u.seeking||'—')}</span></div>
-      <div class="dp-row"><span class="dp-key">Age range</span><span class="dp-val">${u.partner_age_min||18}–${u.partner_age_max||99}</span></div>
-
-      ${u.bio ? `<div class="dp-section-lbl">Bio</div><div class="dp-bio">"${u.bio}"</div>` : ''}
-
-      ${dimBarsHTML ? `<div class="dp-section-lbl">R1 Dimension Scores</div>${dimBarsHTML}` : ''}
-
-      ${narrative ? `<div class="dp-section-lbl">R1 Narrative</div><div class="dp-narrative">${narrative.slice(0,500)}${narrative.length>500?'…':''}</div>` : ''}
-
-      <div class="dp-section-lbl">Account</div>
-      <div class="dp-row"><span class="dp-key">Profile score</span><span class="dp-val">${u.profile_score||0}/100</span></div>
-      <div class="dp-row"><span class="dp-key">Status</span><span class="dp-val">${u.status||'active'}</span></div>
-      <div class="dp-row"><span class="dp-key">R1 complete</span><span class="dp-val">${u.r1_complete ? 'Yes' : 'No'}</span></div>
-      <div class="dp-row"><span class="dp-key">In pool</span><span class="dp-val">${u.matching_pool ? 'Yes' : 'No'}</span></div>
-      <div class="dp-row"><span class="dp-key">Subscription</span><span class="dp-val">${u.subscription_tier||'free'}</span></div>
-      <div class="dp-row"><span class="dp-key">Joined</span><span class="dp-val">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</span></div>
-
-      <div class="dp-section-lbl">Match History (${(data.matches||[]).length})</div>
-      ${(data.matches||[]).map(m=>`
-        <div class="dp-row"><span class="dp-key">${m.partner_name||'Match'}</span><span class="dp-val">${m.combined_score ? m.combined_score+'% final' : (m.r1_score||0)+'% R1'} · ${dp(m.status)}</span></div>`).join('') || '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:6px 0">No matches yet</div>'}
-
-      <div class="dp-section-lbl">Payments (${(data.payments||[]).length})</div>
-      ${(data.payments||[]).map(p=>`
-        <div class="dp-row"><span class="dp-key">$${((p.amount||0)/100).toFixed(2)}</span><span class="dp-val">${p.status} · ${p.payment_type?.replace(/_/g,' ')}</span></div>`).join('') || '<div style="font-size:12px;color:rgba(232,213,163,.28);padding:6px 0">No payments</div>'}
-
-      <div class="dp-actions">
-        ${u.status === 'suspended'
-          ? `<button class="btn-sm btn-outline" onclick="reinstateUser('${userId}','${u.first_name}');closeDetail()" style="padding:9px">Restore Account</button>`
-          : `<button class="btn-sm btn-danger" onclick="openSuspendModal('${userId}','${u.first_name||u.email}');closeDetail()" style="padding:9px">Suspend Account</button>`}
-        <button class="btn-sm btn-outline" onclick="closeDetail()" style="padding:9px">Close</button>
-      </div>`;
-  } catch (e) {
-    document.getElementById('detail-content').innerHTML = `<div class="err-row">Failed to load: ${e.message}</div>`;
-  }
-}
-
-function closeDetail() { document.getElementById('detail-panel').classList.remove('open'); }
-
-// ── PENDING ────────────────────────────────────────────────────
-async function loadPending() {
-  const tbody = document.getElementById('pending-body');
-  try {
-    const res  = await api('/api/admin/users?limit=50');
-    const data = await res.json();
-    const rows = (data.users || []).filter(u => !u.matching_pool && u.status !== 'suspended');
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No pending profiles</td></tr>'; return; }
-    tbody.innerHTML = rows.map(u => `
-      <tr>
-        <td><div class="td-name">${u.first_name||''} ${u.last_name||''}</div><div class="td-sub">${u.email}</div></td>
-        <td style="font-family:'Cormorant Garamond',serif;font-size:15px;color:#C9A84C">${u.profile_score||0}</td>
-        <td>${u.city||'—'}</td>
-        <td style="color:rgba(232,213,163,.32)">${u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
-        <td><div class="row-actions">
-          <button class="act-btn act-view" onclick="openUserDetail('${u.id}')">View</button>
-        </div></td>
-      </tr>`).join('');
-  } catch (e) { tbody.innerHTML = `<tr><td colspan="5" class="err-row">${e.message}</td></tr>`; }
-}
-
-// ── MATCHES ────────────────────────────────────────────────────
-async function loadMatches() {
-  const status = document.getElementById('match-filter')?.value || '';
-  const tbody  = document.getElementById('matches-body');
-  tbody.innerHTML = '<tr><td colspan="7" class="loading-row"><div class="spinner"></div></td></tr>';
-  try {
-    const res  = await api(`/api/admin/matches?limit=30${status ? '&status='+status : ''}`);
-    const data = await res.json();
-    const rows = data.matches || [];
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No matches found</td></tr>'; return; }
-    const sc = { notified:'pill-blue', pending_r2:'pill-gold', scoring_r2:'pill-gold', approved:'pill-green', messaging_unlocked:'pill-green', declined:'pill-grey', flagged:'pill-red', expired:'pill-grey' };
-    tbody.innerHTML = rows.map(m => `
-      <tr>
-        <td><div class="td-name">${m.name_a||'User A'}</div><div class="td-sub">↔ ${m.name_b||'User B'}</div></td>
-        <td style="font-family:'Cormorant Garamond',serif;font-size:15px;color:#C9A84C">${m.r1_score??'—'}%</td>
-        <td>${m.combined_score ? `<span style="font-family:'Cormorant Garamond',serif;font-size:15px;color:#C9A84C">${m.combined_score}%</span>` : '<span style="color:rgba(232,213,163,.25)">—</span>'}</td>
-        <td><span class="pill ${sc[m.status]||'pill-grey'}">${(m.status||'').replace(/_/g,' ')}</span></td>
-        <td style="font-family:monospace;font-size:12px;color:rgba(232,213,163,.4)">${m.r2_a_completed_at?'✓':'○'} / ${m.r2_b_completed_at?'✓':'○'}</td>
-        <td style="color:rgba(232,213,163,.3)">${m.created_at ? new Date(m.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
-        <td><div class="row-actions">
-          <button class="act-btn act-approve" onclick="overrideMatch('${m.id}','approve','${m.name_a}','${m.name_b}')">Approve</button>
-          <button class="act-btn act-decline" onclick="overrideMatch('${m.id}','decline','${m.name_a}','${m.name_b}')">Decline</button>
-          <button class="act-btn act-warn" onclick="overrideMatch('${m.id}','flag','${m.name_a}','${m.name_b}')">Flag</button>
-        </div></td>
-      </tr>`).join('');
-  } catch (e) { tbody.innerHTML = `<tr><td colspan="7" class="err-row">${e.message}</td></tr>`; }
-}
-
-// ── CONVERSATIONS ──────────────────────────────────────────────
-async function loadConversations() {
-  const tbody = document.getElementById('convs-body');
-  try {
-    const res  = await api('/api/admin/matches?status=messaging_unlocked&limit=50');
-    const data = await res.json();
-    const rows = data.matches || [];
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No active conversations</td></tr>'; return; }
-    tbody.innerHTML = rows.map(m => {
-      const daysLeft = m.expires_at ? Math.max(0, Math.ceil((new Date(m.expires_at) - Date.now()) / 86400000)) : '—';
-      return `<tr>
-        <td><div class="td-name">${m.name_a||'?'}</div><div class="td-sub">↔ ${m.name_b||'?'}</div></td>
-        <td style="font-family:'Cormorant Garamond',serif;font-size:15px;color:#C9A84C">${m.combined_score||'—'}%</td>
-        <td>—</td>
-        <td><span class="pill ${daysLeft !== '—' && daysLeft <= 3 ? 'pill-red':'pill-gold'}">${daysLeft}${daysLeft !== '—' ? 'd':''}</span></td>
-        <td style="color:rgba(232,213,163,.3)">${m.messaging_unlocked_at ? new Date(m.messaging_unlocked_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
-        <td><button class="act-btn act-decline" onclick="closeConversation('${m.id}')">Force Close</button></td>
-      </tr>`;
-    }).join('');
-  } catch (e) { tbody.innerHTML = `<tr><td colspan="6" class="err-row">${e.message}</td></tr>`; }
-}
-
-// ── MODERATION ─────────────────────────────────────────────────
-async function loadModeration() {
-  try {
-    const [repRes, usersRes] = await Promise.all([
-      api('/api/admin/reports'),
-      api('/api/admin/users?status=suspended&limit=20'),
-    ]);
-    const repData   = await repRes.json();
-    const usersData = await usersRes.json();
-    const reports   = repData.reports || [];
-    const suspended = usersData.users || [];
-
-    const tbody = document.getElementById('reports-body');
-    tbody.innerHTML = !reports.length
-      ? '<tr><td colspan="6" class="empty-row">No open reports</td></tr>'
-      : reports.map(r => `
-          <tr>
-            <td><span class="pill ${r.type==='message'?'pill-blue':'pill-gold'}">${r.type}</span></td>
-            <td class="td-name">${r.reporter_name||r.reporter_email||'—'}</td>
-            <td>${r.subject_name||r.subject_email||'—'}</td>
-            <td style="color:rgba(232,76,76,.7)">${r.reason||'—'}</td>
-            <td style="color:rgba(232,213,163,.3)">${r.created_at ? new Date(r.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
-            <td><div class="row-actions">
-              <button class="act-btn act-approve" onclick="resolveReport('${r.id}','dismiss')">Dismiss</button>
-              <button class="act-btn act-decline" onclick="resolveReport('${r.id}','warn_user')">Warn</button>
-            </div></td>
-          </tr>`).join('');
-
-    const stbody = document.getElementById('suspended-body');
-    stbody.innerHTML = !suspended.length
-      ? '<tr><td colspan="4" class="empty-row">No suspended accounts</td></tr>'
-      : suspended.map(u => `
-          <tr>
-            <td class="td-name">${u.first_name||''} ${u.last_name||''}</td>
-            <td style="color:rgba(232,213,163,.35)">${u.email}</td>
-            <td style="color:rgba(232,213,163,.32)">${u.updated_at ? new Date(u.updated_at).toLocaleDateString() : '—'}</td>
-            <td><button class="act-btn act-approve" onclick="reinstateUser('${u.id}','${u.first_name||u.email}')">Reinstate</button></td>
-          </tr>`).join('');
-  } catch (e) {
-    document.getElementById('reports-body').innerHTML = `<tr><td colspan="6" class="err-row">${e.message}</td></tr>`;
-  }
-}
-
-// ── REVENUE ────────────────────────────────────────────────────
-async function loadRevenue() {
-  try {
-    const res  = await api('/api/admin/revenue/summary');
-    const data = await res.json();
-    const t    = data.totals || {};
-
-    document.getElementById('rev-stats').innerHTML = [
-      { label:'Gross All-time',    val:`$${((t.gross||0)/100).toFixed(2)}`, sub:'before Stripe fees' },
-      { label:'Gross MTD',         val:`$${((t.mtd||0)/100).toFixed(2)}`,   sub:'this month' },
-      { label:'Conversation Unlocks', val:t.unlocks||0,   sub:'payments', cls:'green' },
-      { label:'Gold Subscribers',  val:t.gold_subs||0,    sub:'active' },
-      { label:'Total Refunds',     val:t.refund_count||0, sub:`$${((t.refunded||0)/100).toFixed(2)}`, cls:(t.refund_count > 0 ? 'red':'') },
-    ].map(c => `
-      <div class="stat-card ${c.cls||''}">
-        <div class="stat-label">${c.label}</div>
-        <div class="stat-val">${c.val}</div>
-        <div class="stat-sub">${c.sub}</div>
-      </div>`).join('');
-
-    // Payment table
-    const res2  = await api('/api/admin/revenue/payments');
-    const data2 = await res2.json().catch(() => ({}));
-    const payments = data2.payments || [];
-    const tbody = document.getElementById('revenue-body');
-    tbody.innerHTML = !payments.length
-      ? '<tr><td colspan="6" class="empty-row">No payments yet</td></tr>'
-      : payments.map(p => `
-          <tr>
-            <td class="td-name">${p.user_name||p.user_email||'—'}</td>
-            <td><span class="pill ${p.payment_type==='gold_subscription'?'pill-gold':'pill-blue'}">${p.payment_type==='gold_subscription'?'Gold':'Unlock'}</span></td>
-            <td style="font-family:'Cormorant Garamond',serif;font-size:16px;color:${p.status==='refunded'?'rgba(232,76,76,.7)':'#C9A84C'}">${p.status==='refunded'?'−':''}$${((p.amount||0)/100).toFixed(2)}</td>
-            <td><span class="pill ${p.status==='succeeded'?'pill-green':p.status==='refunded'?'pill-red':'pill-grey'}">${p.status}</span></td>
-            <td style="color:rgba(232,213,163,.32)">${p.created_at ? new Date(p.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '—'}</td>
-            <td>${p.status==='succeeded' ? `<button class="act-btn act-decline" onclick="openRefundModal('${p.id}','${((p.amount||0)/100).toFixed(2)}')">Refund</button>` : '—'}</td>
-          </tr>`).join('');
-  } catch (e) {
-    document.getElementById('rev-stats').innerHTML = `<div class="err-row">Error: ${e.message}</div>`;
-  }
-}
-
-// ── ENGINE ─────────────────────────────────────────────────────
-async function loadEngine() {
-  try {
-    const [statsRes, runsRes] = await Promise.all([api('/api/admin/stats'), api('/api/admin/engine/runs')]);
-    const stats = await statsRes.json();
-    const runs  = await runsRes.json();
-    const s = stats.users || {}, m = stats.matches || {};
-    document.getElementById('engine-stats').innerHTML = [
-      { label:'Users in Pool',     val: s.inPool ?? 0,  sub:'ready for matching' },
-      { label:'Matches This Month',val: m.total ?? 0,   sub:'all time' },
-      { label:'Avg R1 Score',      val:`${m.avgR1Score ?? 0}%`, sub:'across all matches' },
-      { label:'Last Run',          val: stats.lastEngineRun ? new Date(stats.lastEngineRun.started_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : 'Never', sub:'runs daily at 2 AM' },
-    ].map(c => `
-      <div class="stat-card">
-        <div class="stat-label">${c.label}</div>
-        <div class="stat-val">${c.val}</div>
-        <div class="stat-sub">${c.sub}</div>
-      </div>`).join('');
-    renderEngineRunsTable(runs.runs || [], 'engine-body');
-  } catch (e) { document.getElementById('engine-stats').innerHTML = `<div class="err-row">${e.message}</div>`; }
-}
-
-function renderEngineRunsTable(runs, tbodyId) {
-  const tbody = document.getElementById(tbodyId);
-  if (!runs.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No engine runs yet</td></tr>'; return; }
-  tbody.innerHTML = runs.map(r => `
-    <tr>
-      <td>${r.started_at ? new Date(r.started_at).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
-      <td><span class="pill ${r.dry_run ? 'pill-grey':'pill-green'}">${r.dry_run ? 'Dry run':'Live'}</span></td>
-      <td>${r.users_processed ?? 0}</td>
-      <td style="color:#C9A84C;font-weight:500">${r.matches_created ?? 0}</td>
-      <td style="color:rgba(232,213,163,.4)">${r.duration_seconds ? r.duration_seconds+'s' : '—'}</td>
-      <td><span class="pill ${r.completed_at ? 'pill-green':'pill-gold'}">${r.completed_at ? 'complete':'running'}</span></td>
-    </tr>`).join('');
-}
-
-// ── BROADCAST ──────────────────────────────────────────────────
-function initBroadcast() {
-  const segs = [
-    { id:'all',           label:'All Active Users',  count:'everyone' },
-    { id:'in_pool',       label:'In Match Pool',     count:'awaiting matches' },
-    { id:'r1_complete',   label:'R1 Complete',       count:'did questionnaire' },
-    { id:'Calgary',       label:'Calgary',           count:'city' },
-    { id:'Toronto',       label:'Toronto',           count:'city' },
-    { id:'Washington DC', label:'Washington DC',     count:'city' },
-    { id:'Vancouver',     label:'Vancouver',         count:'city' },
-    { id:'New York',      label:'New York',          count:'city' },
-    { id:'Los Angeles',   label:'Los Angeles',       count:'city' },
-    { id:'Edmonton',      label:'Edmonton',          count:'city' },
-  ];
-  document.getElementById('seg-grid').innerHTML = segs.map(s => `
-    <div class="seg-card ${s.id==='all'?'on':''}" onclick="selectSeg('${s.id}',this)">
-      <div class="seg-title">${s.label}</div>
-      <div class="seg-count">${s.count}</div>
-    </div>`).join('');
-
-  document.getElementById('ch-row').innerHTML = [
-    {id:'push',label:'Push'},
-    {id:'email',label:'Email'},
-    {id:'in_app',label:'In-app'}
-  ].map(c => `
-    <button class="ch-btn on" data-ch="${c.id}" onclick="toggleCh(this)">${c.label}</button>`).join('');
-}
-
-function selectSeg(id, el) {
-  bcSegment = id;
-  document.querySelectorAll('.seg-card').forEach(c => c.classList.remove('on'));
-  el.classList.add('on');
-}
-function toggleCh(el) {
-  el.classList.toggle('on');
-  bcChannels = [...document.querySelectorAll('.ch-btn.on')].map(b => b.dataset.ch);
-}
-function updatePreview() {
-  const t = document.getElementById('bc-title')?.value||'';
-  const b = document.getElementById('bc-body')?.value||'';
-  document.getElementById('bc-preview').textContent = [t, b].filter(Boolean).join('\n\n') || 'Preview will appear here…';
-}
-function clearBroadcast() {
-  document.getElementById('bc-title').value = '';
-  document.getElementById('bc-body').value  = '';
-  document.getElementById('bc-result').textContent = '';
-  updatePreview();
-}
-
-async function sendBroadcast() {
-  const title = document.getElementById('bc-title')?.value?.trim();
-  const body  = document.getElementById('bc-body')?.value?.trim();
-  if (!title || !body) return toast('Fill in title and message');
-  if (!bcChannels.length) return toast('Select at least one channel');
-
-  const resultEl = document.getElementById('bc-result');
-  resultEl.textContent = 'Sending…';
-  try {
-    const res  = await api('/api/notifications/broadcast', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'community_event',
-        segment: bcSegment,
-        channels: bcChannels,
-        data: { eventName: title, eventDescription: body },
-      }),
+    const payload = jwt.verify(header.slice(7), process.env.JWT_SECRET, {
+      issuer: 'hassabe.com', audience: 'hassabe-api',
     });
-    const data = await res.json();
-    resultEl.textContent = `✓ Broadcast sent to ${data.sent || bcSegment} — ${data.count || ''} recipients`;
-    toast('Broadcast sent');
-    clearBroadcast();
-  } catch (e) {
-    resultEl.style.color = 'rgba(232,76,76,.8)';
-    resultEl.textContent = `Failed: ${e.message}`;
-  }
+    const result = await pool.query(
+      'SELECT id, name, email, status, is_admin FROM public.users WHERE id = $1', [payload.sub]
+    );
+    if (!result.rows[0]) return res.status(401).json({ error: 'Account not found' });
+    if (!result.rows[0].is_admin) return res.status(403).json({ error: 'Admin access required' });
+    req.admin = result.rows[0];
+    next();
+  } catch { return res.status(401).json({ error: 'Invalid token' }); }
 }
 
-// ── MATCH ACTIONS ──────────────────────────────────────────────
-function overrideMatch(matchId, action, nameA, nameB) {
-  openModal({
-    title: `${action.charAt(0).toUpperCase()+action.slice(1)} match`,
-    body:  `Override: ${action} the match between ${nameA} and ${nameB}.`,
-    fields: [{ label:'Admin note (reason)', id:'override-note', type:'textarea', ph:'Reason for override…' }],
-    actions: [
-      { label: action==='approve'?'Approve':'Decline', cls:'btn-gold', fn: async () => {
-        const note = document.getElementById('override-note')?.value;
-        const res  = await api(`/api/admin/matches/${matchId}/override`, {
-          method: 'POST', body: JSON.stringify({ action, note }),
-        });
-        closeModal();
-        loadMatches();
-        toast(`Match ${action}d`);
-      }},
-      { label:'Cancel', cls:'btn-outline', fn: closeModal },
-    ],
-  });
+// ── Rate limiter (admin routes don't need to be too strict) ──
+const adminLimiter = rateLimit({ windowMs: 60 * 1000, max: 200 });
+router.use(requireAdmin, adminLimiter);
+
+// ── Validation helper ──
+function checkV(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  return null;
 }
 
-async function closeConversation(matchId) {
-  if (!confirm('Force-close this conversation? Both users will be notified.')) return;
-  await api(`/api/chat/admin/close/${matchId}`, {
-    method:'POST', body: JSON.stringify({ reason:'Admin action' }),
-  });
-  loadConversations();
-  toast('Conversation closed');
+// ── Audit log helper ──
+async function auditLog(adminId, action, targetType, targetId, detail = null) {
+  await pool.query(`
+    INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, detail)
+    VALUES ($1, $2, $3, $4, $5)
+  `, [adminId, action, targetType, targetId, detail]).catch(() => {});
 }
 
-// ── USER ACTIONS ───────────────────────────────────────────────
-function openSuspendModal(userId, name) {
-  openModal({
-    title: `Suspend ${name}`,
-    body:  'The user will be immediately logged out. Their profile will be hidden from the matching pool.',
-    fields: [{ label:'Reason', id:'suspend-reason', type:'textarea', ph:'Reason for suspension…' }],
-    actions: [
-      { label:'Suspend Account', cls:'btn-danger', fn: async () => {
-        const reason = document.getElementById('suspend-reason')?.value || 'Admin suspension';
-        await api(`/api/admin/users/${userId}/suspend`, {
-          method:'PUT', body: JSON.stringify({ reason }),
-        });
-        closeModal();
-        loadUsers();
-        toast('Account suspended');
-      }},
-      { label:'Cancel', cls:'btn-outline', fn: closeModal },
-    ],
-  });
-}
-
-async function reinstateUser(userId, name) {
-  await api(`/api/admin/users/${userId}/reinstate`, { method:'PUT' });
-  loadUsers();
-  loadModeration();
-  toast(`${name} reinstated`);
-}
-
-// ── REPORT ACTIONS ─────────────────────────────────────────────
-async function resolveReport(reportId, action) {
-  await api(`/api/admin/reports/${reportId}`, {
-    method:'PUT', body: JSON.stringify({ action }),
-  });
-  loadModeration();
-  loadBadges();
-  toast(`Report ${action==='dismiss'?'dismissed':'actioned'}`);
-}
-
-// ── REFUND ─────────────────────────────────────────────────────
-function openRefundModal(paymentId, amount) {
-  openModal({
-    title: `Refund $${amount}`,
-    body:  'This will issue a full refund via Stripe. The conversation will be re-locked.',
-    fields: [{ label:'Reason', id:'refund-reason', type:'select', opts:['requested_by_customer','duplicate','fraudulent','other'] }],
-    actions: [
-      { label:'Process Refund', cls:'btn-danger', fn: async () => {
-        const reason = document.getElementById('refund-reason')?.value;
-        await api(`/api/payments/refund/${paymentId}`, {
-          method:'POST', body: JSON.stringify({ reason }),
-        });
-        closeModal();
-        loadRevenue();
-        toast('Refund processed');
-      }},
-      { label:'Cancel', cls:'btn-outline', fn: closeModal },
-    ],
-  });
-}
-
-// ── ENGINE RUN ─────────────────────────────────────────────────
-function openRunEngine() {
-  openModal({
-    title: 'Run Matching Engine',
-    body:  'Run the AI matching engine now. All users in the pool will be evaluated. Matches above the 72% threshold will be created and both users notified.',
-    fields: [],
-    actions: [
-      { label:'▶ Run Live', cls:'btn-gold', fn: async () => { await runEngine(false); closeModal(); }},
-      { label:'◌ Dry Run',  cls:'btn-outline', fn: async () => { await runEngine(true);  closeModal(); }},
-      { label:'Cancel',     cls:'btn-outline', fn: closeModal },
-    ],
-  });
-}
-
-async function runEngine(dryRun) {
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/stats — Master dashboard statistics
+// ══════════════════════════════════════════════════════════════
+router.get('/stats', async (req, res) => {
   try {
-    const res  = await api('/api/admin/engine/run', { method:'POST', body: JSON.stringify({ dryRun }) });
-    const data = await res.json();
-    toast(dryRun ? `Dry run started (ID: ${data.runId?.slice(0,8)})` : `Engine running — Run ID: ${data.runId?.slice(0,8)}`);
-    setTimeout(() => { if (currentPanel==='engine' || currentPanel==='overview') loadPanel(currentPanel); }, 3000);
-  } catch (e) { toast(`Engine error: ${e.message}`); }
-}
+    const [users, matches, payments, reports, pool_status, engine] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*)                                       AS total,
+          COUNT(*) FILTER (WHERE status = 'active')     AS active,
+          COUNT(*) FILTER (WHERE r1_complete = true)    AS r1_complete,
+          COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours') AS joined_today,
+          COUNT(*) FILTER (WHERE subscription_tier = 'gold') AS gold_subs
+        FROM public.users
+      `),
+      pool.query(`
+        SELECT
+          COUNT(*)                                                   AS total,
+          COUNT(*) FILTER (WHERE status NOT IN ('expired','declined')) AS active,
+          COUNT(*) FILTER (WHERE status = 'messaging_unlocked')     AS unlocked,
+          COUNT(*) FILTER (WHERE status = 'flagged')                AS flagged,
+          COUNT(*) FILTER (WHERE status = 'pending_r2')             AS pending_r2,
+          ROUND(AVG(r1_score), 1)                                   AS avg_r1_score,
+          ROUND(AVG(combined_score) FILTER (WHERE combined_score IS NOT NULL), 1) AS avg_combined
+        FROM matches
+      `),
+      pool.query(`
+        SELECT
+          SUM(amount) FILTER (WHERE status = 'succeeded')  AS gross_all_time,
+          SUM(amount) FILTER (WHERE status = 'succeeded'
+            AND created_at >= date_trunc('month', now()))  AS gross_mtd,
+          COUNT(*) FILTER (WHERE status = 'succeeded'
+            AND payment_type = 'conversation_unlock')      AS total_unlocks,
+          COUNT(*) FILTER (WHERE status = 'refunded')      AS total_refunds
+        FROM payments
+      `),
+      pool.query(`
+        SELECT COUNT(*) AS open FROM match_reports WHERE reviewed = false
+      `),
+      pool.query(`
+        SELECT COUNT(*) AS in_pool FROM profiles WHERE matching_pool = true
+      `),
+      pool.query(`
+        SELECT started_at, duration_seconds, matches_created, errors,
+          CASE
+            WHEN completed_at IS NOT NULL AND (errors IS NULL OR errors = 0) THEN 'success'
+            WHEN completed_at IS NOT NULL AND errors > 0 THEN 'partial'
+            WHEN notes IS NOT NULL THEN 'failed'
+            ELSE 'running'
+          END AS status
+        FROM engine_runs ORDER BY started_at DESC LIMIT 1
+      `),
+    ]);
 
-// ── MODAL SYSTEM ───────────────────────────────────────────────
-function openModal({ title, body, fields=[], actions=[] }) {
-  const fieldsHtml = fields.map(f => `
-    <div class="modal-field">
-      <label class="modal-label">${f.label}</label>
-      ${f.type==='select'
-        ? `<select class="modal-sel" id="${f.id}">${(f.opts||[]).map(o=>`<option value="${o}">${o.replace(/_/g,' ')}</option>`).join('')}</select>`
-        : f.type==='textarea'
-        ? `<textarea class="modal-ta" id="${f.id}" placeholder="${f.ph||''}"></textarea>`
-        : `<input class="modal-in" id="${f.id}" placeholder="${f.ph||''}">`}
-    </div>`).join('');
+    const u = users.rows[0];
+    const m = matches.rows[0];
+    const p = payments.rows[0];
 
-  document.getElementById('modal-inner').innerHTML = `
-    <h3>${title}</h3>
-    ${body ? `<p>${body}</p>` : ''}
-    ${fieldsHtml}
-    <div class="modal-footer">
-      ${actions.map((a,i) => `<button class="btn-sm ${a.cls}" id="modal-act-${i}">${a.label}</button>`).join('')}
-    </div>`;
+    res.json({
+      users: {
+        total:      parseInt(u.total),
+        active:     parseInt(u.active),
+        r1Complete: parseInt(u.r1_complete),
+        joinedToday:parseInt(u.joined_today),
+        goldSubs:   parseInt(u.gold_subs),
+        inPool:     parseInt(pool_status.rows[0].in_pool),
+      },
+      matches: {
+        total:       parseInt(m.total),
+        active:      parseInt(m.active),
+        unlocked:    parseInt(m.unlocked),
+        flagged:     parseInt(m.flagged),
+        pendingR2:   parseInt(m.pending_r2),
+        avgR1Score:  parseFloat(m.avg_r1_score || 0),
+        avgCombined: parseFloat(m.avg_combined || 0),
+      },
+      revenue: {
+        grossAllTime: parseInt(p.gross_all_time || 0),
+        grossMtd:     parseInt(p.gross_mtd || 0),
+        totalUnlocks: parseInt(p.total_unlocks || 0),
+        totalRefunds: parseInt(p.total_refunds || 0),
+      },
+      openReports:  parseInt(reports.rows[0].open),
+      lastEngineRun: engine.rows[0] || null,
+    });
+  } catch (err) {
+    console.error('Admin stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
 
-  actions.forEach((a, i) => {
-    document.getElementById(`modal-act-${i}`).onclick = a.fn;
-  });
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/users — Paginated user list
+// ══════════════════════════════════════════════════════════════
+router.get('/users',
+  [query('page').optional().isInt({min:1}), query('limit').optional().isInt({min:1,max:100}), query('q').optional().isString()],
+  async (req, res) => {
+    const page   = parseInt(req.query.page  || 1);
+    const limit  = parseInt(req.query.limit || 25);
+    const q      = req.query.q?.trim() || null;
+    const status = req.query.status || null;
+    const offset = (page - 1) * limit;
 
-  document.getElementById('modal-bg').classList.add('open');
-}
+    try {
+      const where  = [];
+      const params = [];
+      let   pi     = 1;
 
-function closeModal() { document.getElementById('modal-bg').classList.remove('open'); }
+      if (q) {
+        where.push(`(u.email ILIKE $${pi} OR p.first_name ILIKE $${pi} OR p.last_name ILIKE $${pi} OR p.city ILIKE $${pi})`);
+        params.push(`%${q}%`); pi++;
+      }
+      if (status) { where.push(`u.status = $${pi}`); params.push(status); pi++; }
 
-// ── TOAST ──────────────────────────────────────────────────────
-let toastT;
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastT);
-  toastT = setTimeout(() => t.classList.remove('show'), 3000);
-}
-</script>
-</body>
-</html>
+      const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+      const result = await pool.query(`
+        SELECT
+          u.id, u.email, u.status, u.r1_complete, u.profile_complete,
+          u.subscription_tier, u.created_at, u.is_admin,
+          p.first_name, p.last_name, p.city, p.country,
+          p.religion, p.profile_score, p.matching_pool,
+          p.relationship_goal,
+          (SELECT COUNT(*) FROM matches m WHERE m.user_a_id = u.id OR m.user_b_id = u.id) AS match_count,
+          (SELECT COUNT(*) FROM payments py WHERE py.user_id = u.id AND py.status = 'succeeded') AS payment_count
+        FROM public.users u
+        LEFT JOIN profiles p ON p.user_id = u.id
+        ${whereClause}
+        ORDER BY u.created_at DESC
+        LIMIT $${pi} OFFSET $${pi+1}
+      `, [...params, limit, offset]);
+
+      const countResult = await pool.query(
+        `SELECT COUNT(*) FROM public.users u LEFT JOIN profiles p ON p.user_id = u.id ${whereClause}`,
+        params
+      );
+
+      res.json({
+        users: result.rows,
+        total: parseInt(countResult.rows[0].count),
+        page, limit,
+        totalPages: Math.ceil(parseInt(countResult.rows[0].count) / limit),
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/users/:id — User detail
+// ══════════════════════════════════════════════════════════════
+router.get('/users/:id', [param('id').isUUID()], async (req, res) => {
+  const err = checkV(req, res); if (err) return;
+  try {
+    const [userResult, matchResult, paymentResult, qResult] = await Promise.all([
+      pool.query(`
+        SELECT u.*, p.*,
+          date_part('year', age(p.date_of_birth))::int AS age,
+          ARRAY[]::text[] AS photos
+        FROM public.users u
+        LEFT JOIN profiles p ON p.user_id = u.id
+        WHERE u.id = $1 GROUP BY u.id, p.id
+      `, [req.params.id]),
+      pool.query(`
+        SELECT m.id, m.r1_score, m.combined_score, m.status, m.created_at,
+          CASE WHEN m.user_a_id = $1 THEN pb.first_name ELSE pa.first_name END AS partner_name
+        FROM matches m
+        JOIN profiles pa ON pa.user_id = m.user_a_id
+        JOIN profiles pb ON pb.user_id = m.user_b_id
+        WHERE m.user_a_id = $1 OR m.user_b_id = $1
+        ORDER BY m.created_at DESC LIMIT 10
+      `, [req.params.id]),
+      pool.query(
+        'SELECT id, amount, payment_type, status, created_at FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10',
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT round, completed_at, status, dimension_scores, narrative_text
+         FROM questionnaire_responses WHERE user_id = $1 ORDER BY round, created_at DESC`,
+        [req.params.id]
+      ),
+    ]);
+    if (!userResult.rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json({ user: userResult.rows[0], matches: matchResult.rows, payments: paymentResult.rows, questionnaires: qResult.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  PUT /api/admin/users/:id/suspend
+// ══════════════════════════════════════════════════════════════
+router.put('/users/:id/suspend',
+  [param('id').isUUID(), body('reason').notEmpty().isLength({max:500})],
+  async (req, res) => {
+    const err = checkV(req, res); if (err) return;
+    // Prevent self-suspension
+    if (req.params.id === req.admin.id) return res.status(400).json({ error: 'Cannot suspend your own account' });
+    try {
+      await pool.query(
+        `UPDATE public.users SET status = 'suspended', updated_at = now() WHERE id = $1 AND is_admin = false`,
+        [req.params.id]
+      );
+      await pool.query(
+        `UPDATE profiles SET matching_pool = false, is_visible = false WHERE user_id = $1`,
+        [req.params.id]
+      );
+      await auditLog(req.admin.id, 'suspend_user', 'user', req.params.id, req.body.reason);
+      res.json({ message: 'Account suspended.' });
+    } catch (err) { res.status(500).json({ error: 'Suspend failed' }); }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  PUT /api/admin/users/:id/reinstate
+// ══════════════════════════════════════════════════════════════
+router.put('/users/:id/reinstate', [param('id').isUUID()], async (req, res) => {
+  const err = checkV(req, res); if (err) return;
+  try {
+    await pool.query(
+      `UPDATE public.users SET status = 'active', updated_at = now() WHERE id = $1`, [req.params.id]
+    );
+    await pool.query(
+      `UPDATE profiles SET is_visible = true WHERE user_id = $1 AND profile_score >= 70`, [req.params.id]
+    );
+    await auditLog(req.admin.id, 'reinstate_user', 'user', req.params.id);
+    res.json({ message: 'Account reinstated.' });
+  } catch { res.status(500).json({ error: 'Reinstate failed' }); }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  DELETE /api/admin/users/:id — GDPR hard delete
+// ══════════════════════════════════════════════════════════════
+router.delete('/users/:id',
+  [param('id').isUUID(), body('confirm').equals('DELETE')],
+  async (req, res) => {
+    const err = checkV(req, res); if (err) return;
+    if (req.params.id === req.admin.id) return res.status(400).json({ error: 'Cannot delete your own account' });
+    try {
+      // Anonymise rather than delete (preserves match integrity for the other user)
+      await pool.query(`
+        UPDATE public.users SET
+          email     = 'deleted-' || id || '@deleted.hassabe',
+          name      = 'Deleted User',
+          status    = 'deleted',
+          updated_at = now()
+        WHERE id = $1
+      `, [req.params.id]);
+      await pool.query(`
+        UPDATE profiles SET
+          first_name = 'Deleted', last_name = 'User',
+          bio = NULL, city = NULL,
+          is_visible = false, matching_pool = false
+        WHERE user_id = $1
+      `, [req.params.id]);
+      await auditLog(req.admin.id, 'delete_user', 'user', req.params.id, 'GDPR deletion');
+      res.json({ message: 'User data anonymised (GDPR compliant).' });
+    } catch { res.status(500).json({ error: 'Deletion failed' }); }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/matches — Full match queue
+// ══════════════════════════════════════════════════════════════
+router.get('/matches',
+  [query('status').optional().isString(), query('page').optional().isInt({min:1})],
+  async (req, res) => {
+    const page   = parseInt(req.query.page || 1);
+    const limit  = 25;
+    const offset = (page - 1) * limit;
+    const status = req.query.status || null;
+    try {
+      const result = await pool.query(`
+        SELECT
+          m.id, m.r1_score, m.r2_score, m.combined_score, m.status,
+          m.score_breakdown, m.admin_override, m.admin_note,
+          m.r2_expires_at, m.created_at, m.messaging_unlocked_at,
+          m.r2_a_completed_at, m.r2_b_completed_at,
+          pa.first_name AS name_a, pa.city AS city_a,
+          pb.first_name AS name_b, pb.city AS city_b,
+          m.compatibility_summary,
+          (SELECT COUNT(*) FROM match_reports mr WHERE mr.match_id = m.id AND mr.reviewed = false) AS open_reports
+        FROM matches m
+        JOIN profiles pa ON pa.user_id = m.user_a_id
+        JOIN profiles pb ON pb.user_id = m.user_b_id
+        ${status ? 'WHERE m.status = $3' : ''}
+        ORDER BY
+          CASE m.status WHEN 'flagged' THEN 1 WHEN 'scoring_r2' THEN 2 WHEN 'pending_r2' THEN 3 ELSE 4 END,
+          m.combined_score DESC NULLS LAST, m.created_at DESC
+        LIMIT $1 OFFSET $2
+      `, status ? [limit, offset, status] : [limit, offset]);
+
+      const countResult = await pool.query(
+        `SELECT COUNT(*) FROM matches ${status ? 'WHERE status = $1' : ''}`,
+        status ? [status] : []
+      );
+
+      res.json({ matches: result.rows, total: parseInt(countResult.rows[0].count), page });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch matches' });
+    }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  POST /api/admin/matches/:id/override
+// ══════════════════════════════════════════════════════════════
+router.post('/matches/:id/override',
+  [
+    param('id').isUUID(),
+    body('action').isIn(['approve','decline','flag','unflag','rescore']),
+    body('note').optional().isString().isLength({max:500}),
+  ],
+  async (req, res) => {
+    const err = checkV(req, res); if (err) return;
+    const { action, note } = req.body;
+    try {
+      const statusMap = { approve:'approved', decline:'declined', flag:'flagged', unflag:'notified' };
+      if (action === 'rescore') {
+        const { runFinalScoring } = require('./round2-routes');
+        const result = await runFinalScoring(req.params.id, 'admin');
+        await auditLog(req.admin.id, 'rescore_match', 'match', req.params.id);
+        return res.json({ message: 'Final scoring complete.', result });
+      }
+      await pool.query(`
+        UPDATE matches SET
+          status         = $1,
+          admin_override = true,
+          admin_note     = $2,
+          updated_at     = now()
+        WHERE id = $3
+      `, [statusMap[action], note || null, req.params.id]);
+      await auditLog(req.admin.id, `match_${action}`, 'match', req.params.id, note);
+
+      // Notify both users if approved/declined
+      if (action === 'approve' || action === 'decline') {
+        const m = await pool.query('SELECT user_a_id, user_b_id, r1_score, combined_score FROM matches WHERE id = $1', [req.params.id]);
+        if (m.rows[0]) {
+          const { user_a_id, user_b_id } = m.rows[0];
+          const type = action === 'approve' ? 'match_approved' : 'match_declined';
+          await Promise.all([
+            notify(user_a_id, type, { matchId: req.params.id, combinedScore: m.rows[0].combined_score }),
+            notify(user_b_id, type, { matchId: req.params.id, combinedScore: m.rows[0].combined_score }),
+          ]);
+        }
+      }
+
+      res.json({ message: `Match ${action}d.` });
+    } catch (err) {
+      res.status(500).json({ error: `Override failed: ${err.message}` });
+    }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/reports — Unreviewed reports
+// ══════════════════════════════════════════════════════════════
+router.get('/reports', async (req, res) => {
+  try {
+    const [msgReports, matchReports] = await Promise.all([
+      pool.query(`
+        SELECT mr.id, 'message' AS type, mr.reason, mr.details, mr.created_at,
+          ru.email AS reporter_email, rp.first_name AS reporter_name,
+          su.email AS subject_email,  sp.first_name AS subject_name,
+          msg.content AS message_preview, msg.match_id
+        FROM message_reports mr
+        JOIN public.users ru ON ru.id = mr.reporter_id
+        JOIN profiles rp ON rp.user_id = mr.reporter_id
+        JOIN messages msg ON msg.id = mr.message_id
+        JOIN public.users su ON su.id = msg.sender_id
+        JOIN profiles sp ON sp.user_id = msg.sender_id
+        WHERE mr.reviewed = false
+        ORDER BY mr.created_at DESC LIMIT 50
+      `),
+      pool.query(`
+        SELECT mr.id, 'match' AS type, mr.reason, mr.details, mr.created_at,
+          ru.email AS reporter_email, rp.first_name AS reporter_name,
+          m.id AS match_id
+        FROM match_reports mr
+        JOIN public.users ru ON ru.id = mr.reporter_id
+        JOIN profiles rp ON rp.user_id = mr.reporter_id
+        JOIN matches m ON m.id = mr.match_id
+        WHERE mr.reviewed = false
+        ORDER BY mr.created_at DESC LIMIT 50
+      `),
+    ]);
+    res.json({ reports: [...msgReports.rows, ...matchReports.rows].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)) });
+  } catch { res.status(500).json({ error: 'Failed to fetch reports' }); }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  PUT /api/admin/reports/:id — Resolve a report
+// ══════════════════════════════════════════════════════════════
+router.put('/reports/:id',
+  [param('id').isUUID(), body('action').isIn(['dismiss','warn_user','suspend_user','close_match'])],
+  async (req, res) => {
+    const err = checkV(req, res); if (err) return;
+    const { action } = req.body;
+    try {
+      // Try both report tables
+      await pool.query(
+        `UPDATE message_reports SET reviewed = true, action_taken = $1 WHERE id = $2`,
+        [action, req.params.id]
+      );
+      await pool.query(
+        `UPDATE match_reports SET reviewed = true, action_taken = $1 WHERE id = $2`,
+        [action, req.params.id]
+      );
+      await auditLog(req.admin.id, `resolve_report_${action}`, 'report', req.params.id);
+      res.json({ message: `Report resolved: ${action}` });
+    } catch { res.status(500).json({ error: 'Resolve failed' }); }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/revenue/summary
+// ══════════════════════════════════════════════════════════════
+router.get('/revenue/summary', async (req, res) => {
+  try {
+    const [totals, monthly] = await Promise.all([
+      pool.query(`
+        SELECT
+          SUM(amount) FILTER (WHERE status='succeeded')                      AS gross,
+          SUM(amount) FILTER (WHERE status='succeeded' AND created_at >= date_trunc('month',now())) AS mtd,
+          COUNT(*) FILTER (WHERE status='succeeded' AND payment_type='conversation_unlock') AS unlocks,
+          COUNT(*) FILTER (WHERE status='succeeded' AND payment_type='gold_subscription')  AS gold_subs,
+          SUM(amount) FILTER (WHERE status='refunded')                       AS refunded,
+          COUNT(*) FILTER (WHERE status='refunded')                          AS refund_count
+        FROM payments
+      `),
+      pool.query(`
+        SELECT date_trunc('month',created_at) AS month, SUM(amount) AS revenue, COUNT(*) AS count
+        FROM payments WHERE status='succeeded' AND created_at > now() - interval '12 months'
+        GROUP BY 1 ORDER BY 1 DESC
+      `),
+    ]);
+    res.json({ totals: totals.rows[0], monthly: monthly.rows });
+  } catch { res.status(500).json({ error: 'Failed to fetch revenue' }); }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/engine/runs — Engine run history
+// ══════════════════════════════════════════════════════════════
+router.get('/engine/runs', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM engine_runs ORDER BY started_at DESC LIMIT 20`
+    );
+    res.json({ runs: result.rows });
+  } catch { res.status(500).json({ error: 'Failed to fetch engine runs' }); }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  POST /api/admin/engine/run — Trigger engine
+// ══════════════════════════════════════════════════════════════
+router.post('/engine/run',
+  [body('dryRun').optional().isBoolean(), body('userId').optional().isUUID()],
+  async (req, res) => {
+    const err = checkV(req, res); if (err) return;
+    const { dryRun = false, userId = null } = req.body;
+
+    // Insert engine run record
+    const runResult = await pool.query(
+      `INSERT INTO engine_runs (started_at, dry_run, triggered_by) VALUES (now(), $1, 'admin') RETURNING id`,
+      [dryRun]
+    );
+    const runId = runResult.rows[0].id;
+
+    res.json({ message: `Engine ${dryRun ? 'dry run' : 'live run'} started.`, runId });
+
+    // Run in background
+    runMatchingEngine({ dryRun, userId })
+      .then(async stats => {
+        await pool.query(`
+          UPDATE engine_runs SET
+            completed_at        = now(),
+            users_processed     = $1,
+            candidates_evaluated= $2,
+            matches_created     = $3,
+            errors              = $4,
+            duration_seconds    = EXTRACT(EPOCH FROM (now() - started_at))
+          WHERE id = $5
+        `, [stats.usersProcessed, stats.candidatesEvaluated, stats.matchesCreated, stats.errors, runId]);
+      })
+      .catch(async err => {
+        await pool.query(
+          `UPDATE engine_runs SET notes = $1 WHERE id = $2`,
+          [err.message, runId]
+        );
+      });
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/audit — Admin action audit log
+// ══════════════════════════════════════════════════════════════
+router.get('/audit',
+  [query('page').optional().isInt({min:1})],
+  async (req, res) => {
+    const page   = parseInt(req.query.page || 1);
+    const offset = (page - 1) * 50;
+    try {
+      const result = await pool.query(`
+        SELECT al.*, u.name AS admin_name, u.email AS admin_email
+        FROM admin_audit_log al
+        JOIN public.users u ON u.id = al.admin_id
+        ORDER BY al.created_at DESC LIMIT 50 OFFSET $1
+      `, [offset]);
+      res.json({ log: result.rows });
+    } catch { res.status(500).json({ error: 'Failed to fetch audit log' }); }
+  }
+);
+
+module.exports = router;
+
+// ══════════════════════════════════════════════════════════════
+//  MOUNT IN server.js:
+//
+//  const adminRoutes = require('./admin-routes');
+//  app.use('/api/admin', adminRoutes);
+// ══════════════════════════════════════════════════════════════
+
+// GET /api/admin/revenue/payments — payment list for admin
+router.get('/revenue/payments',
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const result = await pool.query(`
+        SELECT p.id, p.amount, p.currency, p.payment_type, p.status,
+               p.stripe_payment_intent, p.created_at,
+               u.email AS user_email,
+               pr.first_name || ' ' || COALESCE(pr.last_name,'') AS user_name
+        FROM payments p
+        JOIN public.users u ON u.id = p.user_id
+        LEFT JOIN profiles pr ON pr.user_id = p.user_id
+        ORDER BY p.created_at DESC LIMIT 100
+      `);
+      res.json({ payments: result.rows });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch payments' });
+    }
+  }
+);
