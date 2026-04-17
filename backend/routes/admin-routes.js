@@ -133,7 +133,13 @@ router.get('/stats', async (req, res) => {
         SELECT COUNT(*) AS in_pool FROM profiles WHERE matching_pool = true
       `),
       pool.query(`
-        SELECT started_at, duration_seconds, matches_created, status
+        SELECT started_at, duration_seconds, matches_created, errors,
+          CASE
+            WHEN completed_at IS NOT NULL AND (errors IS NULL OR errors = 0) THEN 'success'
+            WHEN completed_at IS NOT NULL AND errors > 0 THEN 'partial'
+            WHEN notes IS NOT NULL THEN 'failed'
+            ELSE 'running'
+          END AS status
         FROM engine_runs ORDER BY started_at DESC LIMIT 1
       `),
     ]);
