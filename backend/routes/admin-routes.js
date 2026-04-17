@@ -62,7 +62,7 @@ async function requireAdmin(req, res, next) {
       issuer: 'hassabe.com', audience: 'hassabe-api',
     });
     const result = await pool.query(
-      'SELECT id, name, email, status, is_admin FROM users WHERE id = $1', [payload.sub]
+      'SELECT id, name, email, status, is_admin FROM public.users WHERE id = $1', [payload.sub]
     );
     if (!result.rows[0]) return res.status(401).json({ error: 'Account not found' });
     if (!result.rows[0].is_admin) return res.status(403).json({ error: 'Admin access required' });
@@ -103,7 +103,7 @@ router.get('/stats', async (req, res) => {
           COUNT(*) FILTER (WHERE r1_complete = true)    AS r1_complete,
           COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours') AS joined_today,
           COUNT(*) FILTER (WHERE subscription_tier = 'gold') AS gold_subs
-        FROM users
+        FROM public.users
       `),
       pool.query(`
         SELECT
@@ -209,7 +209,7 @@ router.get('/users',
           p.relationship_goal,
           (SELECT COUNT(*) FROM matches m WHERE m.user_a_id = u.id OR m.user_b_id = u.id) AS match_count,
           (SELECT COUNT(*) FROM payments py WHERE py.user_id = u.id AND py.status = 'succeeded') AS payment_count
-        FROM users u
+        FROM public.users u
         LEFT JOIN profiles p ON p.user_id = u.id
         ${whereClause}
         ORDER BY u.created_at DESC
@@ -217,7 +217,7 @@ router.get('/users',
       `, [...params, limit, offset]);
 
       const countResult = await pool.query(
-        `SELECT COUNT(*) FROM users u LEFT JOIN profiles p ON p.user_id = u.id ${whereClause}`,
+        `SELECT COUNT(*) FROM public.users u LEFT JOIN profiles p ON p.user_id = u.id ${whereClause}`,
         params
       );
 
@@ -243,7 +243,7 @@ router.get('/users/:id', [param('id').isUUID()], async (req, res) => {
       pool.query(`
         SELECT u.*, p.*,
           array_agg(ph.url ORDER BY ph.position) FILTER (WHERE ph.id IS NOT NULL) AS photos
-        FROM users u
+        FROM public.users u
         LEFT JOIN profiles p ON p.user_id = u.id
         LEFT JOIN profile_photos ph ON ph.profile_id = p.id
         WHERE u.id = $1 GROUP BY u.id, p.id
@@ -284,7 +284,7 @@ router.put('/users/:id/suspend',
     if (req.params.id === req.admin.id) return res.status(400).json({ error: 'Cannot suspend your own account' });
     try {
       await pool.query(
-        `UPDATE users SET status = 'suspended', updated_at = now() WHERE id = $1 AND is_admin = false`,
+        `UPDATE public.users SET status = 'suspended', updated_at = now() WHERE id = $1 AND is_admin = false`,
         [req.params.id]
       );
       await pool.query(
@@ -304,7 +304,7 @@ router.put('/users/:id/reinstate', [param('id').isUUID()], async (req, res) => {
   const err = checkV(req, res); if (err) return;
   try {
     await pool.query(
-      `UPDATE users SET status = 'active', updated_at = now() WHERE id = $1`, [req.params.id]
+      `UPDATE public.users SET status = 'active', updated_at = now() WHERE id = $1`, [req.params.id]
     );
     await pool.query(
       `UPDATE profiles SET is_visible = true WHERE user_id = $1 AND profile_score >= 70`, [req.params.id]
@@ -325,7 +325,7 @@ router.delete('/users/:id',
     try {
       // Anonymise rather than delete (preserves match integrity for the other user)
       await pool.query(`
-        UPDATE users SET
+        UPDATE public.users SET
           email     = 'deleted-' || id || '@deleted.hassabe',
           name      = 'Deleted User',
           status    = 'deleted',
@@ -450,10 +450,10 @@ router.get('/reports', async (req, res) => {
           su.email AS subject_email,  sp.first_name AS subject_name,
           msg.content AS message_preview, msg.match_id
         FROM message_reports mr
-        JOIN users ru ON ru.id = mr.reporter_id
+        JOIN public.users ru ON ru.id = mr.reporter_id
         JOIN profiles rp ON rp.user_id = mr.reporter_id
         JOIN messages msg ON msg.id = mr.message_id
-        JOIN users su ON su.id = msg.sender_id
+        JOIN public.users su ON su.id = msg.sender_id
         JOIN profiles sp ON sp.user_id = msg.sender_id
         WHERE mr.reviewed = false
         ORDER BY mr.created_at DESC LIMIT 50
@@ -463,7 +463,7 @@ router.get('/reports', async (req, res) => {
           ru.email AS reporter_email, rp.first_name AS reporter_name,
           m.id AS match_id
         FROM match_reports mr
-        JOIN users ru ON ru.id = mr.reporter_id
+        JOIN public.users ru ON ru.id = mr.reporter_id
         JOIN profiles rp ON rp.user_id = mr.reporter_id
         JOIN matches m ON m.id = mr.match_id
         WHERE mr.reviewed = false
@@ -589,7 +589,7 @@ router.get('/audit',
       const result = await pool.query(`
         SELECT al.*, u.name AS admin_name, u.email AS admin_email
         FROM admin_audit_log al
-        JOIN users u ON u.id = al.admin_id
+        JOIN public.users u ON u.id = al.admin_id
         ORDER BY al.created_at DESC LIMIT 50 OFFSET $1
       `, [offset]);
       res.json({ log: result.rows });
@@ -617,7 +617,7 @@ router.get('/revenue/payments',
                u.email AS user_email,
                pr.first_name || ' ' || COALESCE(pr.last_name,'') AS user_name
         FROM payments p
-        JOIN users u ON u.id = p.user_id
+        JOIN public.users u ON u.id = p.user_id
         LEFT JOIN profiles pr ON pr.user_id = p.user_id
         ORDER BY p.created_at DESC LIMIT 100
       `);
