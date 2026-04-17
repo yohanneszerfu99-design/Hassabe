@@ -112,7 +112,6 @@ function initChatServer(httpServer) {
           )
           WHERE m.id = $1
             AND (m.user_a_id = $2 OR m.user_b_id = $2)
-          GROUP BY m.id, p.id
         `, [matchId, socket.userId]);
 
         if (!matchResult.rows[0]) {
@@ -467,7 +466,7 @@ async function getMessageHistory(matchId, limit = 50, beforeId = null) {
     WHERE match_id = $1
       AND ($2::uuid IS NULL OR id < $2::uuid)
     ORDER BY sent_at DESC
-    LIMIT $3
+    LIMIT $3::int
   `, [matchId, beforeId, limit]);
 
   return result.rows.reverse(); // chronological order
