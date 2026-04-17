@@ -604,6 +604,109 @@ router.get('/audit',
   }
 );
 
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/conversations/:matchId/messages
+//  View messages in a specific conversation (admin only)
+// ══════════════════════════════════════════════════════════════
+router.get('/conversations/:matchId/messages',
+  [param('matchId').isUUID()],
+  async (req, res) => {
+    const err = checkV(req, res); if (err) return;
+    try {
+      const result = await pool.query(`
+        SELECT msg.id, msg.sender_id, msg.content, msg.type,
+               msg.sent_at, msg.is_flagged, msg.flag_reason,
+               p.first_name AS sender_name
+        FROM messages msg
+        LEFT JOIN profiles p ON p.user_id = msg.sender_id
+        WHERE msg.match_id = $1
+        ORDER BY msg.sent_at ASC
+        LIMIT 200
+      `, [req.params.matchId]);
+
+      // Get match info
+      const matchInfo = await pool.query(`
+        SELECT m.id, m.status, m.combined_score,
+               pa.first_name AS name_a, pb.first_name AS name_b,
+               m.user_a_id, m.user_b_id
+        FROM matches m
+        JOIN profiles pa ON pa.user_id = m.user_a_id
+        JOIN profiles pb ON pb.user_id = m.user_b_id
+        WHERE m.id = $1
+      `, [req.params.matchId]);
+
+      res.json({
+        match: matchInfo.rows[0] || null,
+        messages: result.rows,
+        count: result.rows.length,
+        flaggedCount: result.rows.filter(m => m.is_flagged).length,
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+//  GET /api/admin/flagged-messages — All flagged messages
+// ══════════════════════════════════════════════════════════════
+router.get('/flagged-messages', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT msg.id, msg.match_id, msg.sender_id, msg.content, msg.type,
+             msg.sent_at, msg.flag_reason, msg.is_flagged,
+             p.first_name AS sender_name,
+             pa.first_name AS name_a, pb.first_name AS name_b
+      FROM messages msg
+      LEFT JOIN profiles p ON p.user_id = msg.sender_id
+      LEFT JOIN matches m ON m.id = msg.match_id
+      LEFT JOIN profiles pa ON pa.user_id = m.user_a_id
+      LEFT JOIN profiles pb ON pb.user_id = m.user_b_id
+      WHERE msg.is_flagged = true
+      ORDER BY msg.sent_at DESC
+      LIMIT 100
+    `);
+
+    res.json({ flagged: result.rows, count: result.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch flagged messages' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  PUT /api/admin/messages/:id/dismiss — Dismiss a flag
+// ══════════════════════════════════════════════════════════════
+router.put('/messages/:id/dismiss', [param('id').isUUID()], async (req, res) => {
+  const err = checkV(req, res); if (err) return;
+  try {
+    await pool.query(
+      'UPDATE messages SET is_flagged = false, flag_reason = NULL WHERE id = $1',
+      [req.params.id]
+    );
+    await auditLog(req.admin.id, 'dismiss_flag', 'message', req.params.id);
+    res.json({ message: 'Flag dismissed.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to dismiss flag' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  DELETE /api/admin/messages/:id — Delete a message (admin)
+// ══════════════════════════════════════════════════════════════
+router.delete('/messages/:id', [param('id').isUUID()], async (req, res) => {
+  const err = checkV(req, res); if (err) return;
+  try {
+    await pool.query(
+      `UPDATE messages SET content = '[Removed by admin]', is_flagged = false, flag_reason = 'removed_by_admin' WHERE id = $1`,
+      [req.params.id]
+    );
+    await auditLog(req.admin.id, 'remove_message', 'message', req.params.id);
+    res.json({ message: 'Message removed.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove message' });
+  }
+});
+
 module.exports = router;
 
 // ══════════════════════════════════════════════════════════════
