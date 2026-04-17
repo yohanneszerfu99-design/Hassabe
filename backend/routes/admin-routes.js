@@ -248,10 +248,10 @@ router.get('/users/:id', [param('id').isUUID()], async (req, res) => {
     const [userResult, matchResult, paymentResult, qResult] = await Promise.all([
       pool.query(`
         SELECT u.*, p.*,
-          array_agg(ph.url ORDER BY ph.position) FILTER (WHERE ph.id IS NOT NULL) AS photos
+          date_part('year', age(p.date_of_birth))::int AS age,
+          ARRAY[]::text[] AS photos
         FROM public.users u
         LEFT JOIN profiles p ON p.user_id = u.id
-        LEFT JOIN profile_photos ph ON ph.profile_id = p.id
         WHERE u.id = $1 GROUP BY u.id, p.id
       `, [req.params.id]),
       pool.query(`
@@ -268,7 +268,8 @@ router.get('/users/:id', [param('id').isUUID()], async (req, res) => {
         [req.params.id]
       ),
       pool.query(
-        `SELECT round, completed_at, status FROM questionnaire_responses WHERE user_id = $1 ORDER BY round, created_at DESC`,
+        `SELECT round, completed_at, status, dimension_scores, narrative_text
+         FROM questionnaire_responses WHERE user_id = $1 ORDER BY round, created_at DESC`,
         [req.params.id]
       ),
     ]);
