@@ -40,9 +40,13 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
   pointer-events:none;user-select:none;line-height:1;
 }
 .panel-logo{
-  font-family:'Cormorant Garamond',serif;
-  font-size:26px;font-weight:500;color:#FAF0DC;
+  display:flex;align-items:center;gap:10px;
   text-decoration:none;position:relative;z-index:1;
+}
+.panel-logo img{height:40px;width:auto}
+.panel-logo span{
+  font-family:'Cormorant Garamond',serif;
+  font-size:22px;font-weight:500;color:#FAF0DC;
 }
 .panel-body{position:relative;z-index:1}
 .panel-body h2{
@@ -350,7 +354,10 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
   <!-- LEFT DECORATIVE PANEL -->
   <div class="panel-left">
     <div class="panel-bg-text">ሃ</div>
-    <a class="panel-logo" href="/">Hassabe - ሃሳቤ</a>
+    <a class="panel-logo" href="/">
+      <img src="/assets/logo.png" alt="Hassabe">
+      <span>Hassabe - ሃሳቤ</span>
+    </a>
 
     <div class="panel-body">
       <h2>Intentional<br>matching for<br><em>our people</em></h2>
@@ -408,12 +415,6 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         </div>
         <div class="or-divider">or sign up with email</div>
 
-        <!-- Auth method tabs -->
-        <div class="auth-tabs">
-          <button class="auth-tab active" onclick="switchSignupTab('email', this)">Email</button>
-          <button class="auth-tab" onclick="switchSignupTab('phone', this)">Phone number</button>
-        </div>
-
         <!-- Email fields -->
         <div id="signup-email-fields">
           <div class="form-group">
@@ -451,34 +452,10 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
           </div>
         </div>
 
-        <!-- Phone fields -->
-        <div id="signup-phone-fields" style="display:none">
-          <div class="form-group">
-            <label class="form-label">Full Name</label>
-            <input class="form-input" id="su-name-phone" type="text" placeholder="Your full name" autocomplete="name">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Phone Number</label>
-            <div class="phone-row">
-              <select class="phone-prefix" id="su-prefix">
-                <option value="+1">🇨🇦 +1</option>
-                <option value="+1">🇺🇸 +1</option>
-                <option value="+44">🇬🇧 +44</option>
-                <option value="+46">🇸🇪 +46</option>
-                <option value="+47">🇳🇴 +47</option>
-                <option value="+61">🇦🇺 +61</option>
-                <option value="+251">🇪🇹 +251</option>
-                <option value="+291">🇪🇷 +291</option>
-              </select>
-              <input class="form-input" id="su-phone" type="tel" placeholder="(555) 000-0000" style="flex:1" autocomplete="tel">
-            </div>
-          </div>
-        </div>
-
         <div class="check-row">
           <div class="check-box" id="terms-check" onclick="toggleCheck('terms-check')"></div>
           <div class="check-label" onclick="toggleCheck('terms-check')">
-            I agree to Hassabe's <a href="#" onclick="return false">Terms of Service</a> and <a href="#" onclick="return false">Privacy Policy</a>. I understand my data is encrypted and never shared with third parties.
+            I agree to Hassabe's <a href="https://hassabe.com/terms" target="_blank">Terms of Service</a> and <a href="https://hassabe.com/privacy" target="_blank">Privacy Policy</a>. I understand my data is encrypted and never shared with third parties.
           </div>
         </div>
         <div class="field-error" id="err-terms">Please agree to continue</div>
