@@ -39,7 +39,7 @@ async function requireAuth(req, res, next) {
   if (!h?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authorization required' });
   try {
     const p = jwt.verify(h.slice(7), SECRET, JWT_OPT);
-    const r = await pool.query('SELECT id, email, status FROM users WHERE id = $1', [p.sub]);
+    const r = await pool.query('SELECT id, email, status FROM public.users WHERE id = $1', [p.sub]);
     if (!r.rows[0] || r.rows[0].status !== 'active') return res.status(401).json({ error: 'Account not found' });
     req.user = r.rows[0]; next();
   } catch { return res.status(401).json({ error: 'Invalid or expired token' }); }
@@ -65,7 +65,7 @@ router.post('/register', authLimiter, [
 
     const hash = await bcrypt.hash(password, 12);
     const { rows } = await pool.query(
-      `INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id`,
+      `INSERT INTO public.users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id`,
       [email, hash, name]
     );
     const userId = rows[0].id;
@@ -94,7 +94,7 @@ router.post('/verify-email', otpLimiter, [body('userId').isUUID(), body('code').
     );
     if (!vc.rows[0]) return res.status(400).json({ error: 'Invalid or expired code. Request a new one.' });
     await pool.query('UPDATE verification_codes SET used=true WHERE id=$1', [vc.rows[0].id]);
-    await pool.query('UPDATE users SET email_verified=true WHERE id=$1', [userId]);
+    await pool.query('UPDATE public.users SET email_verified=true WHERE id=$1', [userId]);
     const access = signAccess(userId), refresh = signRefresh(userId);
     await storeRefresh(userId, refresh);
     res.json({ message: 'Email verified. Welcome to Hassabe.', accessToken: access, refreshToken: refresh, userId });
@@ -122,7 +122,7 @@ router.post('/login', authLimiter, [body('email').isEmail().customSanitizer(e =>
       if (!valid) return res.status(401).json({ error: 'Invalid 2FA code.' });
     }
 
-    await pool.query('UPDATE users SET last_login_at=now() WHERE id=$1', [user.id]);
+    await pool.query('UPDATE public.users SET last_login_at=now() WHERE id=$1', [user.id]);
     const access = signAccess(user.id), refresh = signRefresh(user.id);
     await storeRefresh(user.id, refresh);
     res.json({ accessToken: access, refreshToken: refresh, userId: user.id, isAdmin: user.is_admin });
@@ -188,7 +188,7 @@ router.post('/reset-password', authLimiter, [
       [rows[0].id, code]
     );
     if (!vc.rows[0]) return res.status(400).json({ error: 'Invalid or expired code.' });
-    await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(newPassword, 12), rows[0].id]);
+    await pool.query('UPDATE public.users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(newPassword, 12), rows[0].id]);
     await pool.query('UPDATE verification_codes SET used=true WHERE id=$1', [vc.rows[0].id]);
     await pool.query('UPDATE refresh_tokens SET revoked=true WHERE user_id=$1', [rows[0].id]);
     res.json({ message: 'Password reset. Please log in.' });
@@ -199,7 +199,7 @@ router.post('/reset-password', authLimiter, [
 router.post('/resend-verification', authLimiter, [body('userId').isUUID()], async (req, res) => {
   if (!ok(req, res)) return;
   try {
-    const { rows } = await pool.query('SELECT email, name FROM users WHERE id=$1 AND email_verified=false', [req.body.userId]);
+    const { rows } = await pool.query('SELECT email, name FROM public.users WHERE id=$1 AND email_verified=false', [req.body.userId]);
     if (!rows[0]) return res.status(404).json({ error: 'User not found or already verified.' });
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     await pool.query(`UPDATE verification_codes SET used=true WHERE user_id=$1 AND type='email'`, [req.body.userId]);
@@ -215,7 +215,7 @@ router.post('/resend-verification', authLimiter, [body('userId').isUUID()], asyn
 router.post('/setup-2fa', requireAuth, async (req, res) => {
   try {
     const secret = speakeasy.generateSecret({ name: `Hassabe (${req.user.email})`, length: 20 });
-    await pool.query('UPDATE users SET tfa_secret=$1 WHERE id=$2', [secret.base32, req.user.id]);
+    await pool.query('UPDATE public.users SET tfa_secret=$1 WHERE id=$2', [secret.base32, req.user.id]);
     res.json({ qrCode: await qrcode.toDataURL(secret.otpauth_url), secret: secret.base32 });
   } catch { res.status(500).json({ error: '2FA setup failed.' }); }
 });
@@ -224,10 +224,10 @@ router.post('/setup-2fa', requireAuth, async (req, res) => {
 router.post('/confirm-2fa', requireAuth, [body('code').isLength({ min:6, max:6 })], async (req, res) => {
   if (!ok(req, res)) return;
   try {
-    const { rows } = await pool.query('SELECT tfa_secret FROM users WHERE id=$1', [req.user.id]);
+    const { rows } = await pool.query('SELECT tfa_secret FROM public.users WHERE id=$1', [req.user.id]);
     const valid = speakeasy.totp.verify({ secret: rows[0].tfa_secret, encoding: 'base32', token: req.body.code, window: 1 });
     if (!valid) return res.status(400).json({ error: 'Invalid code. Try again.' });
-    await pool.query('UPDATE users SET tfa_enabled=true WHERE id=$1', [req.user.id]);
+    await pool.query('UPDATE public.users SET tfa_enabled=true WHERE id=$1', [req.user.id]);
     res.json({ message: '2FA enabled on your account.' });
   } catch { res.status(500).json({ error: '2FA confirmation failed.' }); }
 });
