@@ -104,7 +104,10 @@ function dp(val, fallback) {
     const res = await fetch(API + '/api/auth/me', {
       headers: { 'Authorization': 'Bearer ' + TOKEN }
     });
-    if (!res.ok) throw new Error('Failed to load profile');
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(res.status + ': ' + errBody);
+    }
     const data = await res.json();
     const u = data.user || data.profile || data;
 
