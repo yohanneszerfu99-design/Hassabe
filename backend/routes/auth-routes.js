@@ -246,7 +246,8 @@ router.get('/me', requireAuth, async (req, res) => {
              p.partner_age_min, p.partner_age_max,
              p.children_preference, p.open_to_relocation,
              p.deal_breakers, p.bio, p.profile_score,
-             p.matching_pool, p.is_visible, p.r1_complete
+             p.matching_pool, p.is_visible,
+             u.r1_complete
       FROM public.users u
       LEFT JOIN profiles p ON p.user_id = u.id
       WHERE u.id = $1
