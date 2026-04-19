@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Profile — Hassabe</title>
+<script src="/js/config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Jost',sans-serif;background:#FDF8F0;color:#2A1C06;min-height:100vh}
+
+/* ── Top bar ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px;border-bottom:.5px solid rgba(139,105,20,.1);
+  background:#fff;position:sticky;top:0;z-index:10;
+}
+.topbar-back{display:flex;align-items:center;gap:8px;text-decoration:none;color:#5A4A2E;font-size:13px;transition:color .15s}
+.topbar-back:hover{color:#2A1C06}
+.topbar-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:500;color:#2A1C06}
+.topbar-edit{padding:7px 16px;border-radius:4px;border:1px solid rgba(139,105,20,.2);background:none;color:#5A4A2E;font-size:12px;font-family:'Jost',sans-serif;cursor:pointer;transition:all .15s;text-decoration:none}
+.topbar-edit:hover{background:rgba(139,105,20,.05);border-color:rgba(139,105,20,.35)}
+
+/* ── Card container ── */
+.profile-wrap{max-width:540px;margin:0 auto;padding:28px 20px 60px}
+
+/* ── Profile header ── */
+.profile-hdr{text-align:center;margin-bottom:28px}
+.profile-av{width:72px;height:72px;border-radius:50%;background:rgba(201,168,76,.12);border:2px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:28px;color:#C9A84C;margin:0 auto 12px}
+.profile-name{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;color:#2A1C06}
+.profile-sub{font-size:13px;color:#9A8A72;margin-top:4px}
+.profile-score-wrap{display:inline-flex;align-items:center;gap:8px;margin-top:12px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:20px;padding:6px 16px}
+.profile-score-num{font-family:'Cormorant Garamond',serif;font-size:20px;color:#C9A84C;font-weight:500}
+.profile-score-lbl{font-size:10px;color:#B5A88C;letter-spacing:.06em}
+
+/* ── Sections ── */
+.section{background:#fff;border-radius:8px;border:.5px solid rgba(139,105,20,.08);padding:20px;margin-bottom:16px}
+.section-title{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(201,168,76,.5);margin-bottom:14px;font-weight:500}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:.5px solid rgba(139,105,20,.05)}
+.row:last-child{border-bottom:none}
+.row-key{font-size:13px;color:#9A8A72}
+.row-val{font-size:13px;color:#2A1C06;text-align:right;max-width:60%}
+.bio-text{font-size:13.5px;color:#5A4A2E;line-height:1.7;font-style:italic;padding:4px 0 4px 12px;border-left:2px solid rgba(201,168,76,.2)}
+.tag{display:inline-block;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.12);border-radius:14px;padding:3px 10px;font-size:11px;color:#8B6914;margin:2px}
+
+/* ── Dimension bars ── */
+.dim-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.dim-label{font-size:12px;color:#9A8A72;width:90px;text-transform:capitalize}
+.dim-track{flex:1;height:8px;background:rgba(201,168,76,.06);border-radius:4px;overflow:hidden}
+.dim-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,rgba(201,168,76,.25),#C9A84C);transition:width .6s ease}
+.dim-val{font-size:12px;color:#B5A88C;width:30px;text-align:right}
+
+/* ── Match stats ── */
+.stat-row{display:flex;gap:12px;margin-bottom:4px}
+.stat-box{flex:1;background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.1);border-radius:6px;padding:14px;text-align:center}
+.stat-num{font-family:'Cormorant Garamond',serif;font-size:24px;color:#C9A84C;font-weight:500}
+.stat-lbl{font-size:10px;color:#B5A88C;letter-spacing:.06em;margin-top:2px}
+
+/* ── Loading ── */
+.loading{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px}
+.spinner{width:28px;height:28px;border:2px solid rgba(201,168,76,.2);border-top-color:#C9A84C;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Nav footer ── */
+.nav-footer{max-width:540px;margin:0 auto;padding:0 20px 40px;display:flex;gap:10px;flex-wrap:wrap}
+.nav-link{flex:1;min-width:120px;text-align:center;padding:10px;border-radius:6px;border:1px solid rgba(139,105,20,.12);background:#fff;color:#5A4A2E;text-decoration:none;font-size:12px;transition:all .15s}
+.nav-link:hover{background:rgba(139,105,20,.04);border-color:rgba(139,105,20,.25)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="matches.html" class="topbar-back">← Back</a>
+  <span class="topbar-title">My Profile</span>
+  <a href="onboarding.html" class="topbar-edit">Edit Profile</a>
+</div>
+
+<div id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:#B5A88C">Loading profile…</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const API   = window.HASSABE_CONFIG.API;
+const TOKEN = localStorage.getItem('hassabe_token') || '';
+
+if (!TOKEN) window.location.href = 'auth.html';
+
+function dp(val, fallback) {
+  fallback = fallback || '—';
+  if (val == null || val === '') return fallback;
+  if (Array.isArray(val)) return val.join(', ') || fallback;
+  return String(val).replace(/_/g, ' ');
+}
+
+(async function loadProfile() {
+  try {
+    // Fetch user + profile data
+    const res = await fetch(API + '/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + TOKEN }
+    });
+    if (!res.ok) throw new Error('Failed to load profile');
+    const data = await res.json();
+    const u = data.user || data.profile || data;
+
+    // Fetch R1 questionnaire data
+    let dimScores = {};
+    let narrative = '';
+    try {
+      const qRes = await fetch(API + '/api/questionnaire/round1', {
+        headers: { 'Authorization': 'Bearer ' + TOKEN }
+      });
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        dimScores = qData.dimension_scores || qData.dimensionScores || {};
+        narrative = qData.narrative_text || qData.narrativeText || '';
+      }
+    } catch (e) { /* ignore */ }
+
+    // Fetch match stats
+    let matchCount = 0;
+    let activeConvs = 0;
+    try {
+      const mRes = await fetch(API + '/api/matches', {
+        headers: { 'Authorization': 'Bearer ' + TOKEN }
+      });
+      if (mRes.ok) {
+        const mData = await mRes.json();
+        const matches = mData.matches || [];
+        matchCount = matches.length;
+        activeConvs = matches.filter(function(m) { return m.status === 'messaging_unlocked'; }).length;
+      }
+    } catch (e) { /* ignore */ }
+
+    const firstName = u.first_name || u.firstName || '';
+    const lastName = u.last_name || u.lastName || '';
+    const initials = ((firstName || '?')[0] + (lastName || '?')[0]).toUpperCase();
+    const age = u.age || (u.date_of_birth ? Math.floor((Date.now() - new Date(u.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000)) : null);
+
+    const langs = Array.isArray(u.languages) ? u.languages : [];
+    const dealBreakers = Array.isArray(u.deal_breakers) ? u.deal_breakers : [];
+
+    // Dimension bars
+    const dimOrder = ['values', 'culture', 'faith', 'family', 'communication', 'goals', 'lifestyle'];
+    var dimHTML = dimOrder
+      .filter(function(d) { return dimScores[d] !== undefined; })
+      .map(function(d) {
+        return '<div class="dim-row">' +
+          '<span class="dim-label">' + d + '</span>' +
+          '<div class="dim-track"><div class="dim-fill" style="width:' + dimScores[d] + '%"></div></div>' +
+          '<span class="dim-val">' + dimScores[d] + '</span>' +
+        '</div>';
+      }).join('');
+
+    document.getElementById('app').innerHTML =
+      '<div class="profile-wrap">' +
+
+        '<div class="profile-hdr">' +
+          '<div class="profile-av">' + initials + '</div>' +
+          '<div class="profile-name">' + firstName + ' ' + lastName + '</div>' +
+          '<div class="profile-sub">' + [age ? age + ' years old' : null, dp(u.city), dp(u.country)].filter(Boolean).join(' · ') + '</div>' +
+          '<div class="profile-score-wrap">' +
+            '<span class="profile-score-num">' + (u.profile_score || u.profileScore || 0) + '</span>' +
+            '<span class="profile-score-lbl">Profile Score</span>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="stat-row">' +
+          '<div class="stat-box"><div class="stat-num">' + matchCount + '</div><div class="stat-lbl">Matches</div></div>' +
+          '<div class="stat-box"><div class="stat-num">' + activeConvs + '</div><div class="stat-lbl">Conversations</div></div>' +
+          '<div class="stat-box"><div class="stat-num">' + (u.r1_complete || u.r1Complete ? '✓' : '—') + '</div><div class="stat-lbl">R1 Complete</div></div>' +
+        '</div>' +
+
+        '<div class="section">' +
+          '<div class="section-title">Personal</div>' +
+          '<div class="row"><span class="row-key">Profession</span><span class="row-val">' + dp(u.profession) + '</span></div>' +
+          '<div class="row"><span class="row-key">Education</span><span class="row-val">' + dp(u.education_level || u.educationLevel) + '</span></div>' +
+          '<div class="row"><span class="row-key">Ethnicity</span><span class="row-val">' + dp(u.ethnicity) + '</span></div>' +
+          '<div class="row"><span class="row-key">Languages</span><span class="row-val">' + (langs.length ? langs.map(function(l) { return '<span class="tag">' + l + '</span>'; }).join('') : '—') + '</span></div>' +
+        '</div>' +
+
+        '<div class="section">' +
+          '<div class="section-title">Faith & Values</div>' +
+          '<div class="row"><span class="row-key">Religion</span><span class="row-val">' + dp(u.religion) + '</span></div>' +
+          '<div class="row"><span class="row-key">Practice level</span><span class="row-val">' + dp(u.practice_level || u.practiceLevel) + '</span></div>' +
+          '<div class="row"><span class="row-key">Heritage strength</span><span class="row-val">' + dp(u.heritage_strength || u.heritageStrength) + '</span></div>' +
+        '</div>' +
+
+        '<div class="section">' +
+          '<div class="section-title">Relationship</div>' +
+          '<div class="row"><span class="row-key">Goal</span><span class="row-val">' + dp(u.relationship_goal || u.relationshipGoal) + '</span></div>' +
+          '<div class="row"><span class="row-key">Seeking</span><span class="row-val">' + dp(u.seeking) + '</span></div>' +
+          '<div class="row"><span class="row-key">Age range</span><span class="row-val">' + (u.partner_age_min || 18) + '–' + (u.partner_age_max || 99) + '</span></div>' +
+          '<div class="row"><span class="row-key">Children</span><span class="row-val">' + dp(u.children_preference || u.childrenPreference) + '</span></div>' +
+          '<div class="row"><span class="row-key">Open to relocating</span><span class="row-val">' + dp(u.open_to_relocation || u.openToRelocation) + '</span></div>' +
+          (dealBreakers.length ? '<div class="row"><span class="row-key">Deal breakers</span><span class="row-val">' + dealBreakers.map(function(d) { return '<span class="tag">' + dp(d) + '</span>'; }).join('') + '</span></div>' : '') +
+        '</div>' +
+
+        (u.bio ? '<div class="section"><div class="section-title">Bio</div><div class="bio-text">"' + u.bio + '"</div></div>' : '') +
+
+        (dimHTML ? '<div class="section"><div class="section-title">R1 Dimension Scores</div>' + dimHTML + '</div>' : '') +
+
+        '<div class="section">' +
+          '<div class="section-title">Account</div>' +
+          '<div class="row"><span class="row-key">Email</span><span class="row-val">' + (u.email || '—') + '</span></div>' +
+          '<div class="row"><span class="row-key">Subscription</span><span class="row-val">' + dp(u.subscription_tier || u.subscriptionTier, 'Free') + '</span></div>' +
+          '<div class="row"><span class="row-key">Joined</span><span class="row-val">' + (u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }) : '—') + '</span></div>' +
+        '</div>' +
+
+        '<div class="nav-footer">' +
+          '<a href="chat.html" class="nav-link">💬 Messages</a>' +
+          '<a href="matches.html" class="nav-link">◆ Matches</a>' +
+          '<a href="onboarding.html" class="nav-link">✎ Edit Profile</a>' +
+        '</div>' +
+
+      '</div>';
+
+  } catch (e) {
+    document.getElementById('app').innerHTML =
+      '<div class="loading"><div style="color:#B5481A;font-size:14px">Failed to load profile: ' + e.message + '</div>' +
+      '<a href="auth.html" style="color:#C9A84C;font-size:13px">Log in again</a></div>';
+  }
+})();
+</script>
+</body>
+</html>
