@@ -233,6 +233,31 @@ router.post('/confirm-2fa', requireAuth, [body('code').isLength({ min:6, max:6 }
 });
 
 // GET /me
-router.get('/me', requireAuth, (req, res) => res.json({ id: req.user.id, email: req.user.email }));
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT u.id, u.email, u.name, u.status, u.email_verified,
+             u.is_admin, u.subscription_tier, u.created_at, u.last_login_at,
+             p.first_name, p.last_name, p.date_of_birth,
+             date_part('year', age(p.date_of_birth))::int AS age,
+             p.city, p.country, p.profession, p.education_level,
+             p.ethnicity, p.languages, p.religion, p.practice_level,
+             p.heritage_strength, p.relationship_goal, p.seeking,
+             p.partner_age_min, p.partner_age_max,
+             p.children_preference, p.open_to_relocation,
+             p.deal_breakers, p.bio, p.profile_score,
+             p.matching_pool, p.is_visible, p.r1_complete
+      FROM public.users u
+      LEFT JOIN profiles p ON p.user_id = u.id
+      WHERE u.id = $1
+    `, [req.user.id]);
+
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('/me error:', err.message);
+    res.status(500).json({ error: 'Failed to load profile' });
+  }
+});
 
 module.exports = router;
