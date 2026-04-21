@@ -1,12 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe ሃሳቤ — Sign In</title>
+<title>Hassabe ሃሳቤ — Intentional Matchmaking for the Ethiopian & Eritrean Diaspora</title>
+<meta name="description" content="Hassabe is an AI-powered matchmaking platform for the Ethiopian and Eritrean diaspora. Two rounds of deep compatibility. Faith, heritage, and family values at the core.">
+<meta name="theme-color" content="#0C0902">
+<link rel="canonical" href="https://hassabe.com/">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hassabe.com/">
+<meta property="og:title" content="Hassabe ሃሳቤ — Intentional Matchmaking for Our People">
+<meta property="og:description" content="No swiping. Two rounds of deep compatibility. AI-powered insights rooted in East African values.">
+<meta property="og:image" content="https://hassabe.com/assets/logo.png">
+<meta property="og:site_name" content="Hassabe">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hassabe ሃሳቤ — Intentional Matchmaking">
+<meta name="twitter:description" content="AI-powered matchmaking for the Ethiopian & Eritrean diaspora. Faith, heritage, and family values at the core.">
+<meta name="twitter:image" content="https://hassabe.com/assets/logo.png">
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
+
+<!-- Fonts: preconnect both domains, swap for CLS -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- Preload critical image -->
+<link rel="preload" as="image" href="/assets/logo.png">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Hassabe",
+  "alternateName": "ሃሳቤ",
+  "url": "https://hassabe.com",
+  "description": "AI-powered matchmaking platform for the Ethiopian and Eritrean diaspora. Two rounds of deep compatibility rooted in East African values.",
+  "applicationCategory": "DatingApplication",
+  "operatingSystem": "Web",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+    "description": "Free to sign up. $49.99 to unlock a conversation."
+  },
+  "creator": {
+    "@type": "Organization",
+    "name": "Hassabe Inc.",
+    "url": "https://hassabe.com"
+  }
+}
+</script>
+
+<script src="/js/config.js"></script>
 <style>
 /* ── RESET ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -70,6 +123,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
   font-size:11px;color:rgba(232,213,163,.2);
   letter-spacing:.04em;position:relative;z-index:1;
 }
+.mobile-header{display:none}
 
 /* Right auth panel */
 .panel-right{
@@ -343,19 +397,31 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
 /* ── MOBILE ── */
 @media(max-width:768px){
   .panel-left{display:none}
-  .panel-right{padding:32px 24px;align-items:flex-start;padding-top:60px}
+  .mobile-header{display:flex;align-items:center;justify-content:center;gap:8px;padding:20px 16px 0;text-decoration:none}
+  .mobile-header img{height:32px;width:auto}
+  .mobile-header span{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:500;color:#2A1C06}
+  .panel-right{padding:24px 20px;align-items:flex-start;padding-top:12px}
   .auth-box{max-width:100%}
+  /* Touch-friendly targets (min 44px) */
+  .form-input,.btn,.auth-tab,.social-btn,.check-box{min-height:44px}
+  .check-row{gap:12px}
 }
 </style>
 </head>
 <body>
-<div class="shell">
+<!-- Mobile header (visible only on mobile when left panel is hidden) -->
+<a class="mobile-header" href="/" aria-label="Hassabe home">
+  <img src="/assets/logo.png" alt="Hassabe logo" width="32" height="32">
+  <span>Hassabe - ሃሳቤ</span>
+</a>
+
+<main class="shell" role="main">
 
   <!-- LEFT DECORATIVE PANEL -->
   <div class="panel-left">
     <div class="panel-bg-text">ሃ</div>
     <a class="panel-logo" href="/">
-      <img src="/assets/logo.png" alt="Hassabe">
+      <img src="/assets/logo.png" alt="Hassabe logo" width="40" height="40">
       <span>Hassabe - ሃሳቤ</span>
     </a>
 
@@ -488,12 +554,12 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         <p class="auth-sub" id="verify-email-desc">We sent a 6-digit code to <strong id="verify-email-address">admin@hassabe.com</strong>. Enter it below to verify your account.</p>
 
         <div class="otp-group">
-          <input class="otp-input" type="text" maxlength="1" id="otp0" oninput="otpInput(this,0)" onkeydown="otpKey(this,0,event)">
-          <input class="otp-input" type="text" maxlength="1" id="otp1" oninput="otpInput(this,1)" onkeydown="otpKey(this,1,event)">
-          <input class="otp-input" type="text" maxlength="1" id="otp2" oninput="otpInput(this,2)" onkeydown="otpKey(this,2,event)">
-          <input class="otp-input" type="text" maxlength="1" id="otp3" oninput="otpInput(this,3)" onkeydown="otpKey(this,3,event)">
-          <input class="otp-input" type="text" maxlength="1" id="otp4" oninput="otpInput(this,4)" onkeydown="otpKey(this,4,event)">
-          <input class="otp-input" type="text" maxlength="1" id="otp5" oninput="otpInput(this,5)" onkeydown="otpKey(this,5,event)">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="otp0" oninput="otpInput(this,0)" onkeydown="otpKey(this,0,event)">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="otp1" oninput="otpInput(this,1)" onkeydown="otpKey(this,1,event)">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="otp2" oninput="otpInput(this,2)" onkeydown="otpKey(this,2,event)">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="otp3" oninput="otpInput(this,3)" onkeydown="otpKey(this,3,event)">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="otp4" oninput="otpInput(this,4)" onkeydown="otpKey(this,4,event)">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="otp5" oninput="otpInput(this,5)" onkeydown="otpKey(this,5,event)">
         </div>
         <div class="field-error" id="err-otp" style="text-align:center">Incorrect code. Please try again.</div>
 
@@ -518,12 +584,12 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         <p class="auth-sub">We sent a 6-digit code via SMS to <strong id="verify-phone-num">+1 555 000 0000</strong>.</p>
 
         <div class="otp-group">
-          <input class="otp-input" type="text" maxlength="1" id="potp0" oninput="otpInput(this,0,'p')" onkeydown="otpKey(this,0,event,'p')">
-          <input class="otp-input" type="text" maxlength="1" id="potp1" oninput="otpInput(this,1,'p')" onkeydown="otpKey(this,1,event,'p')">
-          <input class="otp-input" type="text" maxlength="1" id="potp2" oninput="otpInput(this,2,'p')" onkeydown="otpKey(this,2,event,'p')">
-          <input class="otp-input" type="text" maxlength="1" id="potp3" oninput="otpInput(this,3,'p')" onkeydown="otpKey(this,3,event,'p')">
-          <input class="otp-input" type="text" maxlength="1" id="potp4" oninput="otpInput(this,4,'p')" onkeydown="otpKey(this,4,event,'p')">
-          <input class="otp-input" type="text" maxlength="1" id="potp5" oninput="otpInput(this,5,'p')" onkeydown="otpKey(this,5,event,'p')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="potp0" oninput="otpInput(this,0,'p')" onkeydown="otpKey(this,0,event,'p')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="potp1" oninput="otpInput(this,1,'p')" onkeydown="otpKey(this,1,event,'p')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="potp2" oninput="otpInput(this,2,'p')" onkeydown="otpKey(this,2,event,'p')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="potp3" oninput="otpInput(this,3,'p')" onkeydown="otpKey(this,3,event,'p')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="potp4" oninput="otpInput(this,4,'p')" onkeydown="otpKey(this,4,event,'p')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="potp5" oninput="otpInput(this,5,'p')" onkeydown="otpKey(this,5,event,'p')">
         </div>
 
         <button class="btn btn-primary" onclick="doVerifyPhone()">
@@ -601,12 +667,12 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
         <p class="auth-sub">Enter the 6-digit code from your authenticator app (Google Authenticator, Authy, etc.).</p>
 
         <div class="otp-group">
-          <input class="otp-input" type="text" maxlength="1" id="tfa0" oninput="otpInput(this,0,'t')" onkeydown="otpKey(this,0,event,'t')">
-          <input class="otp-input" type="text" maxlength="1" id="tfa1" oninput="otpInput(this,1,'t')" onkeydown="otpKey(this,1,event,'t')">
-          <input class="otp-input" type="text" maxlength="1" id="tfa2" oninput="otpInput(this,2,'t')" onkeydown="otpKey(this,2,event,'t')">
-          <input class="otp-input" type="text" maxlength="1" id="tfa3" oninput="otpInput(this,3,'t')" onkeydown="otpKey(this,3,event,'t')">
-          <input class="otp-input" type="text" maxlength="1" id="tfa4" oninput="otpInput(this,4,'t')" onkeydown="otpKey(this,4,event,'t')">
-          <input class="otp-input" type="text" maxlength="1" id="tfa5" oninput="otpInput(this,5,'t')" onkeydown="otpKey(this,5,event,'t')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="tfa0" oninput="otpInput(this,0,'t')" onkeydown="otpKey(this,0,event,'t')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="tfa1" oninput="otpInput(this,1,'t')" onkeydown="otpKey(this,1,event,'t')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="tfa2" oninput="otpInput(this,2,'t')" onkeydown="otpKey(this,2,event,'t')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="tfa3" oninput="otpInput(this,3,'t')" onkeydown="otpKey(this,3,event,'t')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="tfa4" oninput="otpInput(this,4,'t')" onkeydown="otpKey(this,4,event,'t')">
+          <input class="otp-input" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" id="tfa5" oninput="otpInput(this,5,'t')" onkeydown="otpKey(this,5,event,'t')">
         </div>
         <div class="field-error" id="err-tfa" style="text-align:center">Incorrect code. Check your authenticator app.</div>
 
@@ -732,7 +798,7 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;color:#2A
 
     </div><!-- /auth-box -->
   </div><!-- /panel-right -->
-</div><!-- /shell -->
+</main><!-- /shell -->
 
 <div id="toast"></div><script>
 'use strict';
