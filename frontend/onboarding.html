@@ -1,12 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe — Build Your Profile</title>
+<title>Build Your Profile — Hassabe ሃሳቤ</title>
+<meta name="description" content="Create your Hassabe profile in 7 steps. Share your background, faith, values, and relationship goals to find your most compatible match.">
+<meta name="theme-color" content="#0C0902">
+<meta name="robots" content="noindex">
+
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="/assets/logo.png">
+
+<script src="/js/config.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'Jost',sans-serif;background:#0C0902;-webkit-font-smoothing:antialiased}
@@ -115,14 +125,38 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
 .bio-tips li{font-size:12px;color:#7A6A4F;line-height:1.7}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(14px);background:#2A1C06;color:#E8D5A3;padding:10px 20px;border-radius:3px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;white-space:nowrap;border:.5px solid rgba(201,168,76,.22)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(max-width:760px){.sidebar{display:none}.main-inner{padding:28px 18px 80px}.fg-row{grid-template-columns:1fr}}
+/* ── Mobile header ── */
+.mobile-hdr{display:none;align-items:center;gap:10px;padding:16px 18px;background:#0C0902;border-bottom:.5px solid rgba(201,168,76,.1)}
+.mobile-hdr img{height:28px;width:auto}
+.mobile-hdr span{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;color:#FAF0DC}
+.mobile-hdr .mh-score{margin-left:auto;font-family:'Cormorant Garamond',serif;font-size:18px;color:#C9A84C;font-weight:500}
+
+@media(max-width:760px){
+  .sidebar{display:none}
+  .mobile-hdr{display:flex}
+  .main-inner{padding:24px 18px 80px}
+  .fg-row{grid-template-columns:1fr}
+  .step-h{font-size:28px}
+  /* Touch-friendly targets (min 44px per Google CWV) */
+  .fi,.fi-select,.fi-textarea,.btn,.chip,.sc-opt{min-height:44px}
+  .chip{padding:11px 18px;font-size:14px}
+  .sc-opt{padding:14px 6px}
+  .topbar-back,.topbar-save{min-height:44px;display:flex;align-items:center}
+  /* Safe area for bottom nav devices */
+  .btn-row{padding-bottom:env(safe-area-inset-bottom,0)}
+}
 </style>
 </head>
 <body>
+<div class="mobile-hdr" aria-label="Profile builder header">
+  <img src="/assets/logo.png" alt="Hassabe logo" width="28" height="28">
+  <span>Hassabe - ሃሳቤ</span>
+  <span class="mh-score" id="mh-score">0/100</span>
+</div>
 <div class="shell">
 
-<aside class="sidebar">
-  <a href="/landing.html" style="display:block;margin-bottom:6px"><img src="/assets/logo.png" alt="Hassabe" style="height:40px;width:auto;vertical-align:middle"></a>
+<aside class="sidebar" role="complementary">
+  <a href="/landing.html" style="display:block;margin-bottom:6px"><img src="/assets/logo.png" alt="Hassabe logo" width="40" height="40" style="vertical-align:middle"></a>
   <div class="sb-sub">Profile Builder · 7 Steps</div>
   <nav class="sb-steps" id="sb-steps"></nav>
   <div class="sb-score-wrap">
@@ -135,7 +169,7 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
   </div>
 </aside>
 
-<main class="main">
+<main class="main" role="main">
 <div class="main-inner">
   <div class="topbar">
     <button class="topbar-back" id="back-btn" onclick="prevStep()">← Back</button>
@@ -150,12 +184,12 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
     <h1 class="step-h">The <em>basics</em></h1>
     <p class="step-desc">Your name, age, location, and who you're looking for. This is where it starts.</p>
     <div class="fg-row">
-      <div class="fg"><label class="fl">First Name</label><input class="fi" id="first-name" type="text" placeholder="Selam"><div class="ferr" id="err-first-name">Required</div></div>
-      <div class="fg"><label class="fl">Last Name</label><input class="fi" id="last-name" type="text" placeholder="Tesfaye"><div class="ferr" id="err-last-name">Required</div></div>
+      <div class="fg"><label class="fl" for="first-name">First Name</label><input class="fi" id="first-name" type="text" placeholder="Selam"><div class="ferr" id="err-first-name">Required</div></div>
+      <div class="fg"><label class="fl" for="last-name">Last Name</label><input class="fi" id="last-name" type="text" placeholder="Tesfaye"><div class="ferr" id="err-last-name">Required</div></div>
     </div>
     <div class="fg-row">
-      <div class="fg"><label class="fl">Date of Birth</label><input class="fi" id="dob" type="date" id="dob-input"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
-      <div class="fg"><label class="fl">Gender</label><select class="fi-select" id="gender"><option value="">Select…</option><option value="female">Female</option><option value="male">Male</option><option value="other">Prefer not to say</option></select><div class="ferr" id="err-gender">Required</div></div>
+      <div class="fg"><label class="fl" for="dob">Date of Birth</label><input class="fi" id="dob" type="date"><div class="fhint">Must be 18+. Shown as age only.</div><div class="ferr" id="err-dob">Required</div></div>
+      <div class="fg"><label class="fl" for="gender">Gender</label><select class="fi-select" id="gender"><option value="">Select…</option><option value="female">Female</option><option value="male">Male</option><option value="other">Prefer not to say</option></select><div class="ferr" id="err-gender">Required</div></div>
     </div>
     <div class="fg">
       <label class="fl">I am seeking</label>
@@ -167,7 +201,7 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
     </div>
     <hr class="sec-div">
     <div class="fg">
-      <label class="fl">Current City</label>
+      <label class="fl" for="city">Current City</label>
       <select class="fi-select" id="city">
         <option value="">Select your city…</option>
         <option value="Calgary">🇨🇦 Calgary, AB</option>
@@ -528,6 +562,8 @@ function updateScore(){
   const score=SCORE_ITEMS.reduce((s,item)=>s+(item.check()?item.pts:0),0);
   document.getElementById('sb-score-num').textContent=score;
   document.getElementById('sb-score-fill').style.width=score+'%';
+  const mhScore=document.getElementById('mh-score');
+  if(mhScore)mhScore.textContent=score+'/100';
   if(document.getElementById('sc-score')){
     document.getElementById('sc-score').textContent=score;
     document.getElementById('sc-fill').style.width=score+'%';
