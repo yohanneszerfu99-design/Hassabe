@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe — Unlock Conversation</title>
+<title>Unlock Conversation — Hassabe ሃሳቤ</title>
+<meta name="description" content="Unlock your Hassabe match conversation. Secure payment via Stripe.">
+<meta name="theme-color" content="#0C0902">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/assets/logo.png">
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <!-- Stripe.js — for card element if using embedded checkout -->
 <script src="https://js.stripe.com/v3/"></script>
@@ -169,17 +176,18 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:a
 @media(max-width:480px){
   .page{padding:32px 16px 60px}
   .price-amount{font-size:54px}
+  .btn,.cta-btn,.pay-btn{min-height:44px}
 }
 </style>
 </head>
 <body>
 <div class="bg-glow"></div>
-<div class="page">
-  <a class="logo" href="#"><img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle"></a>
+<main class="page" role="main">
+  <a class="logo" href="#"><img src="/assets/logo.png" alt="Hassabe logo" width="36" height="36" style="vertical-align:middle"></a>
   <div class="inner" id="inner">
     <!-- Screen injected by JS -->
   </div>
-</div>
+</main>
 <div id="toast"></div>
 
 <script>
