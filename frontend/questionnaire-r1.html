@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe — Round 1 Questionnaire</title>
+<title>Round 1 Questionnaire — Hassabe ሃሳቤ</title>
+<meta name="description" content="Complete your Round 1 compatibility questionnaire on Hassabe. 30 questions across 8 dimensions.">
+<meta name="theme-color" content="#0C0902">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/assets/logo.png">
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 /* ─── RESET ─── */
@@ -305,24 +312,37 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webkit-f
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* ── MOBILE ── */
+/* Mobile header */
+.mobile-hdr{display:none;align-items:center;gap:10px;padding:14px 18px;background:#0C0902}
+.mobile-hdr img{height:28px;width:auto}
+.mobile-hdr span{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;color:#FAF0DC}
+
 @media(max-width:760px){
   .left{display:none}
-  .topbar,.q-main{padding-left:20px;padding-right:20px}
-  .q-main{padding-top:28px}
+  .mobile-hdr{display:flex}
+  .topbar,.q-main{padding-left:16px;padding-right:16px}
+  .q-main{padding-top:24px}
   .scale-row{gap:5px}
-  .scale-opt{padding:10px 4px}
+  .scale-opt{padding:12px 4px;min-height:44px}
   .scale-num{font-size:18px}
   .ynu-row{grid-template-columns:1fr 1fr 1fr}
-  .q-card{padding:20px}
+  .ynu-opt{min-height:44px}
+  .q-card{padding:18px}
+  .btn,.nav-btn,.opt-row{min-height:44px}
+  .topbar h1{font-size:22px}
 }
 </style>
 </head>
 <body>
-<div class="shell">
+<div class="mobile-hdr" aria-label="Round 1 questionnaire">
+  <img src="/assets/logo.png" alt="Hassabe logo" width="28" height="28">
+  <span>Hassabe - ሃሳቤ</span>
+</div>
+<div class="shell" role="main">
 
 <!-- ══ LEFT PANEL ══ -->
 <aside class="left">
-  <a class="left-logo" href="#"><img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle"></a>
+  <a class="left-logo" href="#"><img src="/assets/logo.png" alt="Hassabe logo" width="36" height="36" style="vertical-align:middle"></a>
   <div class="left-subtitle">Round 1 · Foundation</div>
 
   <div class="progress-ring-wrap">
