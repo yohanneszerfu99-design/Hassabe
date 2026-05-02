@@ -3,9 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My Profile — Hassabe</title>
-<script src="/js/config.js"></script>
+<title>My Profile — Hassabe ሃሳቤ</title>
+<meta name="description" content="View your Hassabe profile summary, dimension scores, and match history.">
+<meta name="theme-color" content="#FDF8F0">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -67,17 +73,28 @@ body{font-family:'Jost',sans-serif;background:#FDF8F0;color:#2A1C06;min-height:1
 .nav-footer{max-width:540px;margin:0 auto;padding:0 20px 40px;display:flex;gap:10px;flex-wrap:wrap}
 .nav-link{flex:1;min-width:120px;text-align:center;padding:10px;border-radius:6px;border:1px solid rgba(139,105,20,.12);background:#fff;color:#5A4A2E;text-decoration:none;font-size:12px;transition:all .15s}
 .nav-link:hover{background:rgba(139,105,20,.04);border-color:rgba(139,105,20,.25)}
+
+@media(max-width:560px){
+  .topbar{padding:12px 16px}
+  .topbar-back,.topbar-edit{min-height:44px;display:flex;align-items:center}
+  .profile-wrap{padding:20px 16px 60px}
+  .profile-name{font-size:22px}
+  .stat-row{gap:8px}
+  .stat-box{padding:10px 8px}
+  .stat-num{font-size:20px}
+  .row{padding:10px 0}
+  .nav-link{min-height:44px;display:flex;align-items:center;justify-content:center}
+}
 </style>
 </head>
 <body>
-
-<div class="topbar">
-  <a href="matches.html" class="topbar-back">← Back</a>
+<header class="topbar" role="banner">
+  <a href="matches.html" class="topbar-back" aria-label="Back to matches">← Back</a>
   <span class="topbar-title">My Profile</span>
   <a href="onboarding.html" class="topbar-edit">Edit Profile</a>
-</div>
+</header>
 
-<div id="app">
+<main id="app" role="main">
   <div class="loading">
     <div class="spinner"></div>
     <div style="font-size:13px;color:#B5A88C">Loading profile…</div>
