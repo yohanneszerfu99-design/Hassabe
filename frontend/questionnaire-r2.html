@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe — Round 2 Questionnaire</title>
+<title>Round 2 Questionnaire — Hassabe ሃሳቤ</title>
+<meta name="description" content="Complete Round 2 of your Hassabe compatibility questionnaire with your match.">
+<meta name="theme-color" content="#0C0902">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/assets/logo.png">
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -248,22 +255,34 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webkit-f
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* Mobile */
+/* Mobile header */
+.mobile-hdr{display:none;align-items:center;gap:10px;padding:14px 18px;background:#0C0902}
+.mobile-hdr img{height:28px;width:auto}
+.mobile-hdr span{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;color:#FAF0DC}
+
 @media(max-width:820px){
   .ctx{display:none}
-  .q-area{padding:28px 20px 80px}
-  .topbar{padding:14px 20px}
+  .mobile-hdr{display:flex}
+  .q-area{padding:24px 16px 80px}
+  .topbar{padding:14px 16px}
   .scale-wrap{flex-wrap:wrap}
-  .sc-opt{flex:1 1 calc(33% - 6px);min-width:56px}
+  .sc-opt{flex:1 1 calc(33% - 6px);min-width:56px;min-height:44px}
   .yno-row{grid-template-columns:1fr}
+  .yno-opt,.btn,.nav-btn{min-height:44px}
+  .topbar h1{font-size:20px}
 }
 </style>
 </head>
 <body>
-<div class="shell">
+<div class="mobile-hdr" aria-label="Round 2 questionnaire">
+  <img src="/assets/logo.png" alt="Hassabe logo" width="28" height="28">
+  <span>Hassabe - ሃሳቤ</span>
+</div>
+<div class="shell" role="main">
 
 <!-- ══ LEFT CONTEXT PANEL ══ -->
 <aside class="ctx">
-  <a class="ctx-logo" href="#"><img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle"></a>
+  <a class="ctx-logo" href="#"><img src="/assets/logo.png" alt="Hassabe logo" width="36" height="36" style="vertical-align:middle"></a>
   <div class="ctx-sub">Round 2 · Deep Compatibility</div>
 
   <!-- Match context -->
@@ -956,7 +975,7 @@ function buildResultWaiting() {
   return `
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#FDF8F0;font-family:'Jost',sans-serif">
     <div style="max-width:440px;text-align:center;padding:40px 24px">
-      <div style="font-family:'Cormorant Garamond',serif;font-size:52px;font-weight:400;color:#0C0902;margin-bottom:4px"<img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle">/div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:52px;font-weight:400;color:#0C0902;margin-bottom:4px"<img src="/assets/logo.png" alt="Hassabe logo" width="36" height="36" style="vertical-align:middle">/div>
       <div style="font-size:48px;margin:24px 0">✦</div>
       <div style="font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:400;color:#2A1C06;margin-bottom:12px">Round 2 submitted</div>
       <p style="font-size:14px;font-weight:300;color:#7A6A4F;line-height:1.75;margin-bottom:28px">
