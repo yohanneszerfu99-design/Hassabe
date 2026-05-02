@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe — Your Match Result</title>
+<title>Match Result — Hassabe ሃሳቤ</title>
+<meta name="description" content="View your Hassabe match compatibility result and next steps.">
+<meta name="theme-color" content="#0C0902">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/assets/logo.png">
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -170,14 +177,15 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:a
   .pay-price{font-size:52px}
   .pair-av{width:60px;height:60px;font-size:20px}
   .pair-score{font-size:38px}
+  .btn,.cta-btn{min-height:44px}
 }
 </style>
 </head>
 <body>
 
-<div class="result-page" id="result-page">
+<main class="result-page" role="main" id="result-page">
   <!-- State injected by JS based on ?result=approved|declined -->
-</div>
+</main>
 <div id="toast"></div>
 
 <script>
@@ -239,7 +247,7 @@ function renderResult(result, data) {
   page.innerHTML = `
     <div class="bg-glow ${result}"></div>
     <div class="inner">
-      <div class="logo"><img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle"></div>
+      <div class="logo"><img src="/assets/logo.png" alt="Hassabe logo" width="36" height="36" style="vertical-align:middle"></div>
       ${result === 'approved' ? renderApproved(data) : renderDeclined(data)}
     </div>`;
 
