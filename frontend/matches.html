@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe ሃሳቤ — Your Matches</title>
+<title>Your Matches — Hassabe ሃሳቤ</title>
+<meta name="description" content="View your compatibility matches on Hassabe. See scores, start Round 2, and unlock conversations.">
+<meta name="theme-color" content="#FDF8F0">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/assets/logo.png">
 <script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -67,13 +75,21 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webk
 .nav-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:#C9A84C;color:#0C0902;font-size:10px;font-weight:700;margin-left:4px;vertical-align:middle}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:#2A1C06;color:#E8D5A3;padding:8px 16px;border-radius:3px;font-size:12.5px;z-index:999;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;border:.5px solid rgba(201,168,76,.2)}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(max-width:560px){.ch{flex-wrap:wrap}.cf{flex-direction:column;align-items:flex-start}}
+@media(max-width:560px){
+  .ch{flex-wrap:wrap}
+  .cf{flex-direction:column;align-items:flex-start}
+  .btn,.tab,.nav-link{min-height:44px;display:inline-flex;align-items:center}
+  .tab{padding:8px 16px;font-size:13px}
+  .nav-links{gap:2px}
+  .page{padding:24px 16px 80px}
+  .page-h h1{font-size:28px}
+}
 </style>
 </head>
 <body>
-<div class="page">
-  <nav class="topnav">
-    <a href="/landing.html" style="display:inline-flex;align-items:center;text-decoration:none"><img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle"></a>
+<main class="page" role="main">
+  <nav class="topnav" aria-label="Main navigation">
+    <a href="/landing.html" style="display:inline-flex;align-items:center;text-decoration:none"><img src="/assets/logo.png" alt="Hassabe logo" width="36" height="36" style="vertical-align:middle"></a>
     <div class="nav-links">
       <a class="nav-link active" href="/matches.html">Matches</a>
       <a class="nav-link" href="/notifications.html" id="alerts-link">Alerts</a>
@@ -97,7 +113,7 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webk
   </div>
 
   <div class="grid" id="grid"><div class="loading"><div class="spin"></div>Loading your matches…</div></div>
-</div>
+</main>
 <div id="toast"></div>
 
 <script>
