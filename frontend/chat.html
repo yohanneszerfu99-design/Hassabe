@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Hassabe — Conversation</title>
+<title>Messages — Hassabe ሃሳቤ</title>
+<meta name="description" content="Chat with your Hassabe matches. Private, secure conversations.">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
@@ -340,14 +346,15 @@ html,body{height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:antia
     bottom:0;
     z-index:20;
   }
+  .msg-input,.send-btn,.icon-btn,.conv-item,.conv-nav a,.conv-nav button{min-height:44px}
 }
 </style>
 </head>
 <body>
-<div class="shell">
+<div class="shell" role="main">
 
   <!-- ══ CONVERSATION LIST ══ -->
-  <div class="conv-list">
+  <nav class="conv-list" aria-label="Conversations">
     <div class="conv-header">
       <h2>Messages</h2>
       <p id="conv-count">Loading…</p>
