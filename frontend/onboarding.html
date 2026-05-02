@@ -96,7 +96,7 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
 .score-card{background:#fff;border:.5px solid rgba(139,105,20,.15);border-radius:6px;padding:18px;margin-bottom:18px}
 .sc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .sc-title{font-size:13px;font-weight:500;color:#2A1C06}
-.sc-num-big{font-family:'Cormorant Garamond',serif;font-size:28px;color:#C9A84C;font-weight:500;line-height:1}
+.sc-num-big{font-family:'Cormorant Garamond',serif;font-size:28px;color:#C9A84C;font-weight:500;line-height:1}!QAZxsw2#EDC
 .sc-bar{height:5px;background:rgba(139,105,20,.1);border-radius:3px;overflow:hidden;margin-bottom:12px}
 .sc-fill{height:100%;background:linear-gradient(90deg,#8B6914,#C9A84C);border-radius:3px;transition:width .6s ease}
 .sc-items{display:grid;grid-template-columns:1fr 1fr;gap:5px}
@@ -204,13 +204,44 @@ label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.1em;text-t
       <label class="fl" for="city">Current City</label>
       <select class="fi-select" id="city">
         <option value="">Select your city…</option>
-        <option value="Calgary">🇨🇦 Calgary, AB</option>
-        <option value="Edmonton">🇨🇦 Edmonton, AB</option>
-        <option value="Vancouver">🇨🇦 Vancouver, BC</option>
-        <option value="Toronto">🇨🇦 Toronto, ON</option>
-        <option value="Washington DC">🇺🇸 Washington DC</option>
-        <option value="New York">🇺🇸 New York, NY</option>
-        <option value="Los Angeles">🇺🇸 Los Angeles, CA</option>
+
+        <optgroup label="🇦🇺 Australia">
+          <option value="Melbourne">Melbourne</option>
+          <option value="Sydney">Sydney</option>
+        </optgroup>
+
+        <optgroup label="🇨🇦 Canada">
+          <option value="Calgary">Calgary, AB</option>
+          <option value="Edmonton">Edmonton, AB</option>
+          <option value="Montreal">Montreal, QC</option>
+          <option value="Toronto">Toronto, ON</option>
+          <option value="Vancouver">Vancouver, BC</option>
+        </optgroup>
+
+        <optgroup label="🇪🇺 Europe">
+          <option value="Amsterdam">🇳🇱 Amsterdam</option>
+          <option value="Berlin">🇩🇪 Berlin</option>
+          <option value="Frankfurt">🇩🇪 Frankfurt</option>
+          <option value="London">🇬🇧 London</option>
+          <option value="Oslo">🇳🇴 Oslo</option>
+          <option value="Paris">🇫🇷 Paris</option>
+          <option value="Rome">🇮🇹 Rome</option>
+          <option value="Stockholm">🇸🇪 Stockholm</option>
+        </optgroup>
+
+        <optgroup label="🇺🇸 United States">
+          <option value="Atlanta">Atlanta, GA</option>
+          <option value="Boston">Boston, MA</option>
+          <option value="Chicago">Chicago, IL</option>
+          <option value="Dallas">Dallas, TX</option>
+          <option value="Denver">Denver, CO</option>
+          <option value="Los Angeles">Los Angeles, CA</option>
+          <option value="Minneapolis-Saint Paul">Minneapolis-Saint Paul, MN</option>
+          <option value="New York">New York, NY</option>
+          <option value="Seattle">Seattle, WA</option>
+          <option value="Washington DC">Washington, DC</option>
+        </optgroup>
+
         <option value="other">Other city</option>
       </select>
       <div class="ferr" id="err-city">Please select your city</div>
