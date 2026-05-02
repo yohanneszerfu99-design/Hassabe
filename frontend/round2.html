@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe — Round 2</title>
+<title>Round 2 — Hassabe ሃሳቤ</title>
+<meta name="description" content="Start Round 2 of your Hassabe match. Answer compatibility questions to finalize your match score.">
+<meta name="theme-color" content="#FDF8F0">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -131,12 +137,14 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:a
 
 @media(max-width:480px){
   .q-text{font-size:19px}
-  .scale-btn{padding:12px 4px;font-size:12px}
+  .scale-btn{padding:12px 4px;font-size:12px;min-height:44px}
+  .btn,.nav-btn{min-height:44px}
+  .r2-card{padding:20px 16px}
 }
 </style>
 </head>
 <body>
-<div class="page" id="page">
+<main class="page" id="page" role="main">
 
   <!-- Top bar -->
   <div class="topbar">
@@ -225,7 +233,7 @@ html,body{min-height:100%;font-family:'Jost',sans-serif;-webkit-font-smoothing:a
     <button class="btn-matches" onclick="window.location.href='/matches.html'">Back to matches</button>
   </div>
 
-</div>
+</main>
 <div id="toast"></div>
 
 <script>
