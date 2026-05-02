@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/js/config.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hassabe ሃሳቤ — Notifications</title>
+<title>Notifications — Hassabe ሃሳቤ</title>
+<meta name="description" content="Your Hassabe notifications. Match updates, Round 2 invitations, and conversation alerts.">
+<meta name="theme-color" content="#FDF8F0">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="/assets/logo.png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="/assets/logo.png">
+<script src="/js/config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -163,20 +170,40 @@ html,body{height:100%;font-family:'Jost',sans-serif;background:#FDF8F0;-webkit-f
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* Mobile */
+/* Mobile header */
+.mobile-hdr{display:none;align-items:center;gap:10px;padding:14px 18px;background:#0C0902;border-bottom:.5px solid rgba(201,168,76,.1)}
+.mobile-hdr img{height:28px;width:auto}
+.mobile-hdr span{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:500;color:#FAF0DC}
+.mobile-hdr-links{margin-left:auto;display:flex;gap:4px}
+.mobile-hdr-links a{font-size:11px;color:rgba(232,213,163,.5);text-decoration:none;padding:6px 8px;border-radius:3px;transition:all .15s}
+.mobile-hdr-links a:hover,.mobile-hdr-links a.active{color:#FAF0DC;background:rgba(201,168,76,.12)}
+
 @media(max-width:860px){
   .sidebar{display:none}
-  .topbar,.content{padding-left:20px;padding-right:20px}
-  .push-banner{margin:16px 20px 0}
+  .mobile-hdr{display:flex}
+  .topbar,.content{padding-left:16px;padding-right:16px}
+  .push-banner{margin:16px 16px 0}
   .prefs-sheet{width:100vw}
+  .notif-item,.btn{min-height:44px}
+  .topbar h1{font-size:24px}
 }
 </style>
 </head>
 <body>
+<div class="mobile-hdr" aria-label="Navigation">
+  <img src="/assets/logo.png" alt="Hassabe logo" width="28" height="28">
+  <span>Hassabe - ሃሳቤ</span>
+  <div class="mobile-hdr-links">
+    <a href="/matches.html">Matches</a>
+    <a href="/notifications.html" class="active">Alerts</a>
+    <a href="/chat.html">Chat</a>
+  </div>
+</div>
 <div class="shell">
 
 <!-- ── SIDEBAR ── -->
 <aside class="sidebar">
-  <a class="sb-logo" href="#"><img src="/assets/logo.png" alt="Hassabe" style="height:36px;width:auto;vertical-align:middle"></a>
+  <a class="sb-logo" href="#"><img src="/assets/logo.png" alt="Hassabe logo" width="36" height="36" style="vertical-align:middle"></a>
   <nav class="sb-nav">
     <a class="sb-link" href="/matches.html"><span class="ico">🏠</span>Home</a>
     <a class="sb-link" href="/matches.html"><span class="ico">✦</span>My Matches</a>
