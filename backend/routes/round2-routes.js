@@ -324,9 +324,9 @@ async function runFinalScoring(matchId, triggeredBy = 'auto') {
     `, [
       r2Score, combined, status, matchId,
       summaryData.summary         || null,
-      JSON.stringify(summaryData.shared_values   || []),
-      JSON.stringify(summaryData.icebreakers     || []),
-      JSON.stringify(summaryData.friction_points || []),
+      summaryData.shared_values   || [],
+      summaryData.icebreakers     || [],
+      summaryData.friction_points || [],
     ]);
   } else {
     await pool.query(`
