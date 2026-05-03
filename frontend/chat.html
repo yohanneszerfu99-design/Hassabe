@@ -629,13 +629,14 @@ async function loadConversations() {
     });
     const data = await res.json();
     const unlocked = (data.matches || []).filter(m => m.status === 'messaging_unlocked');
-    renderConversationList(unlocked);
+    const convs = unlocked.map(matchToConv);
+    renderConversationList(convs);
     const urlMatchId = new URLSearchParams(window.location.search).get('matchId');
     if (urlMatchId) {
-      const target = unlocked.find(m => m.id === urlMatchId);
-      if (target) setTimeout(() => openConversation(matchToConv(target)), 300);
-    } else if (unlocked.length > 0) {
-      setTimeout(() => openConversation(matchToConv(unlocked[0])), 300);
+      const target = convs.find(c => c.matchId === urlMatchId);
+      if (target) setTimeout(() => openConversation(target), 300);
+    } else if (convs.length > 0) {
+      setTimeout(() => openConversation(convs[0]), 300);
     }
   } catch (e) {
     document.getElementById('conv-count').textContent = 'Failed to load';
