@@ -659,6 +659,8 @@ function matchToConv(m) {
   };
 }
 
+let conversationMap = {};
+
 function renderConversationList(convs) {
   const items = document.getElementById('conv-items');
   const count = document.getElementById('conv-count');
@@ -667,8 +669,10 @@ function renderConversationList(convs) {
     items.innerHTML = '<div style="padding:24px 18px;font-size:13px;color:#B5A88C">No active conversations yet.</div>';
     return;
   }
+  // Store conversations by matchId for safe lookup (avoids inline JSON issues)
+  convs.forEach(c => conversationMap[c.matchId] = c);
   items.innerHTML = convs.map(c => `
-    <div class="conv-item" id="citem-${c.matchId}" onclick="openConversation(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+    <div class="conv-item" id="citem-${c.matchId}" onclick="openConvById('${c.matchId}')">
       <div class="conv-av">
         ${c.partnerInitials}
         <div class="online-dot"></div>
@@ -684,9 +688,15 @@ function renderConversationList(convs) {
     </div>`).join('');
 }
 
+function openConvById(matchId) {
+  const conv = conversationMap[matchId];
+  if (conv) openConversation(conv);
+}
+
 function openConversation(conv) {
-  if (currentMatch?.matchId === conv.matchId) return;
-  currentMatch = conv;
+  try {
+    if (currentMatch?.matchId === conv.matchId) return;
+    currentMatch = conv;
 
   // Mobile: hide conv list, show chat panel
   document.querySelector('.conv-list').classList.add('hidden-mobile');
@@ -756,6 +766,13 @@ function openConversation(conv) {
     markReadViaSocket(conv.matchId);
   })
   .catch(() => { messages = []; hideLoading(); });
+  } catch (err) {
+    console.error('[Chat] openConversation error:', err);
+    // Still show the UI so user can interact
+    document.getElementById('chat-header').style.display = 'flex';
+    document.getElementById('input-area').style.display   = '';
+    document.getElementById('empty-chat').style.display   = 'none';
+  }
 }
 
 /* ══════════════════════════════════════════════════
